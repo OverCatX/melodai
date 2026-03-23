@@ -2,44 +2,36 @@ import uuid
 from django.db import models
 
 
-# ---------------------------------------------------------------------------
-# Enumerations
-# ---------------------------------------------------------------------------
-
 class GenerationStatus(models.TextChoices):
-    IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
-    COMPLETED   = 'COMPLETED',   'Completed'
-    FAILED      = 'FAILED',      'Failed'
-    DRAFT       = 'DRAFT',       'Draft'
+    IN_PROGRESS = "IN_PROGRESS", "In Progress"
+    COMPLETED = "COMPLETED", "Completed"
+    FAILED = "FAILED", "Failed"
+    DRAFT = "DRAFT", "Draft"
 
 
 class Occasion(models.TextChoices):
-    BIRTHDAY    = 'BIRTHDAY',    'Birthday'
-    WEDDING     = 'WEDDING',     'Wedding'
-    ANNIVERSARY = 'ANNIVERSARY', 'Anniversary'
-    GRADUATION  = 'GRADUATION',  'Graduation'
-    GENERAL     = 'GENERAL',     'General'
+    BIRTHDAY = "BIRTHDAY", "Birthday"
+    WEDDING = "WEDDING", "Wedding"
+    ANNIVERSARY = "ANNIVERSARY", "Anniversary"
+    GRADUATION = "GRADUATION", "Graduation"
+    GENERAL = "GENERAL", "General"
 
 
 class MoodTone(models.TextChoices):
-    HAPPY     = 'HAPPY',     'Happy'
-    SAD       = 'SAD',       'Sad'
-    ROMANTIC  = 'ROMANTIC',  'Romantic'
-    ENERGETIC = 'ENERGETIC', 'Energetic'
-    CALM      = 'CALM',      'Calm'
+    HAPPY = "HAPPY", "Happy"
+    SAD = "SAD", "Sad"
+    ROMANTIC = "ROMANTIC", "Romantic"
+    ENERGETIC = "ENERGETIC", "Energetic"
+    CALM = "CALM", "Calm"
 
 
 class SingerTone(models.TextChoices):
-    MALE_DEEP    = 'MALE_DEEP',    'Male Deep'
-    MALE_LIGHT   = 'MALE_LIGHT',   'Male Light'
-    FEMALE_DEEP  = 'FEMALE_DEEP',  'Female Deep'
-    FEMALE_LIGHT = 'FEMALE_LIGHT', 'Female Light'
-    NEUTRAL      = 'NEUTRAL',      'Neutral'
+    MALE_DEEP = "MALE_DEEP", "Male Deep"
+    MALE_LIGHT = "MALE_LIGHT", "Male Light"
+    FEMALE_DEEP = "FEMALE_DEEP", "Female Deep"
+    FEMALE_LIGHT = "FEMALE_LIGHT", "Female Light"
+    NEUTRAL = "NEUTRAL", "Neutral"
 
-
-# ---------------------------------------------------------------------------
-# Domain Entities
-# ---------------------------------------------------------------------------
 
 class User(models.Model):
     """
@@ -47,14 +39,15 @@ class User(models.Model):
     Authentication (Google OAuth) is outside scope for this exercise;
     the fields below reflect the domain model attributes exactly.
     """
-    user_id       = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    google_id     = models.CharField(max_length=255, unique=True)
-    email         = models.EmailField(unique=True)
-    display_name  = models.CharField(max_length=255)
+
+    user_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    google_id = models.CharField(max_length=255, unique=True)
+    email = models.EmailField(unique=True)
+    display_name = models.CharField(max_length=255)
     session_token = models.CharField(max_length=500, blank=True)
 
     class Meta:
-        ordering = ['display_name']
+        ordering = ["display_name"]
 
     def __str__(self):
         return self.display_name
@@ -65,10 +58,15 @@ class PlaybackSession(models.Model):
     Represents an active or paused playback state for a song.
     loopStart and loopEnd are optional ([0..1] in the domain model).
     """
-    session_id         = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    current_position   = models.FloatField(default=0.0, help_text="Playback position in seconds")
-    loop_start         = models.FloatField(null=True, blank=True, help_text="Loop start in seconds")
-    loop_end           = models.FloatField(null=True, blank=True, help_text="Loop end in seconds")
+
+    session_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    current_position = models.FloatField(
+        default=0.0, help_text="Playback position in seconds"
+    )
+    loop_start = models.FloatField(
+        null=True, blank=True, help_text="Loop start in seconds"
+    )
+    loop_end = models.FloatField(null=True, blank=True, help_text="Loop end in seconds")
     equalizer_settings = models.CharField(max_length=500, blank=True)
 
     def __str__(self):
@@ -82,31 +80,29 @@ class Song(models.Model):
     shareLink is optional ([0..1] in the domain model).
     A Song is played via 0..1 PlaybackSession.
     """
-    song_id           = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    user              = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='songs'
-    )
+
+    song_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="songs")
     # Song (0..*) played via PlaybackSession (0..1)
-    playback_session  = models.ForeignKey(
+    playback_session = models.ForeignKey(
         PlaybackSession,
         on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='songs'
+        null=True,
+        blank=True,
+        related_name="songs",
     )
-    title             = models.CharField(max_length=255)
-    audio_file_url    = models.URLField(blank=True)
+    title = models.CharField(max_length=255)
+    audio_file_url = models.URLField(blank=True)
     generation_status = models.CharField(
-        max_length=20,
-        choices=GenerationStatus.choices,
-        default=GenerationStatus.DRAFT
+        max_length=20, choices=GenerationStatus.choices, default=GenerationStatus.DRAFT
     )
-    created_at        = models.DateTimeField(auto_now_add=True)
-    is_favorite       = models.BooleanField(default=False)
-    is_draft          = models.BooleanField(default=True)
-    share_link        = models.URLField(blank=True)  # optional [0..1]
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_favorite = models.BooleanField(default=False)
+    is_draft = models.BooleanField(default=True)
+    share_link = models.URLField(blank=True)  # optional [0..1]
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.title} ({self.get_generation_status_display()})"
@@ -119,24 +115,21 @@ class Library(models.Model):
     filterCriteria is optional ([0..1] in the domain model).
     totalCount reflects the number of songs currently in the library.
     """
-    user            = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name='library'
-    )
-    songs           = models.ManyToManyField(
-        Song, blank=True, related_name='libraries'
-    )
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="library")
+    songs = models.ManyToManyField(Song, blank=True, related_name="libraries")
     filter_criteria = models.CharField(max_length=500, blank=True)  # optional [0..1]
-    total_count     = models.PositiveIntegerField(default=0)
+    total_count = models.PositiveIntegerField(default=0)
 
     class Meta:
-        verbose_name_plural = 'libraries'
+        verbose_name_plural = "libraries"
 
     def __str__(self):
         return f"{self.user.display_name}'s Library"
 
     def sync_total_count(self):
         self.total_count = self.songs.count()
-        self.save(update_fields=['total_count'])
+        self.save(update_fields=["total_count"])
 
 
 class SongPrompt(models.Model):
@@ -144,15 +137,14 @@ class SongPrompt(models.Model):
     Captures the creative input that defines a Song.
     Exactly one SongPrompt maps to exactly one Song (1..1 both ways).
     """
-    prompt_id    = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    song         = models.OneToOneField(
-        Song, on_delete=models.CASCADE, related_name='prompt'
-    )
-    title        = models.CharField(max_length=255)
-    occasion     = models.CharField(max_length=20, choices=Occasion.choices)
+
+    prompt_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    song = models.OneToOneField(Song, on_delete=models.CASCADE, related_name="prompt")
+    title = models.CharField(max_length=255)
+    occasion = models.CharField(max_length=20, choices=Occasion.choices)
     mood_and_tone = models.CharField(max_length=20, choices=MoodTone.choices)
-    singer_tone  = models.CharField(max_length=20, choices=SingerTone.choices)
-    description  = models.TextField(blank=True)
+    singer_tone = models.CharField(max_length=20, choices=SingerTone.choices)
+    description = models.TextField(blank=True)
 
     def __str__(self):
         return f"Prompt: {self.title} ({self.get_occasion_display()})"
@@ -164,15 +156,16 @@ class AIGenerationRequest(models.Model):
     Exactly one request per prompt (1..1).
     errorMessage is optional ([0..1] in the domain model).
     """
-    request_id    = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    prompt        = models.OneToOneField(
-        SongPrompt, on_delete=models.CASCADE, related_name='generation_request'
+
+    request_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    prompt = models.OneToOneField(
+        SongPrompt, on_delete=models.CASCADE, related_name="generation_request"
     )
-    submitted_at  = models.DateTimeField(auto_now_add=True)
-    status        = models.CharField(
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
         max_length=20,
         choices=GenerationStatus.choices,
-        default=GenerationStatus.IN_PROGRESS
+        default=GenerationStatus.IN_PROGRESS,
     )
     error_message = models.TextField(blank=True)  # optional [0..1]
 
@@ -185,12 +178,13 @@ class SharedSong(models.Model):
     Produced when a Song is shared (Song produces 0..1 SharedSong).
     accessibleByGuest controls whether non-registered users can access the link.
     """
-    share_id           = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    song               = models.OneToOneField(
-        Song, on_delete=models.CASCADE, related_name='shared_song'
+
+    share_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    song = models.OneToOneField(
+        Song, on_delete=models.CASCADE, related_name="shared_song"
     )
-    share_link         = models.URLField(unique=True)
-    shared_at          = models.DateTimeField(auto_now_add=True)
+    share_link = models.URLField(unique=True)
+    shared_at = models.DateTimeField(auto_now_add=True)
     accessible_by_guest = models.BooleanField(default=False)
 
     def __str__(self):
@@ -202,16 +196,15 @@ class Draft(models.Model):
     A Song can be saved as one or more Drafts (0..* in the domain model).
     retentionPolicy determines how long a draft is kept before auto-deletion.
     """
-    draft_id         = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    song             = models.ForeignKey(
-        Song, on_delete=models.CASCADE, related_name='drafts'
-    )
-    saved_at         = models.DateTimeField(auto_now_add=True)
-    is_submitted     = models.BooleanField(default=False)
+
+    draft_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    song = models.ForeignKey(Song, on_delete=models.CASCADE, related_name="drafts")
+    saved_at = models.DateTimeField(auto_now_add=True)
+    is_submitted = models.BooleanField(default=False)
     retention_policy = models.CharField(max_length=255, blank=True)
 
     class Meta:
-        ordering = ['-saved_at']
+        ordering = ["-saved_at"]
 
     def __str__(self):
         return f"Draft of '{self.song.title}' at {self.saved_at:%Y-%m-%d %H:%M}"
