@@ -7,13 +7,14 @@ Django domain layer implementation for an AI-powered song generation platform.
 ## Local Setup
 
 ### Prerequisites
+
 - Python 3.11+
 
 ### Steps
 
 ```bash
 # 1. Clone the repository
-git clone <repo-url>
+git clone https://github.com/OverCatX/ai-song-domain.git
 cd ai-song-domain
 
 # 2. Create and activate a virtual environment
@@ -45,38 +46,38 @@ python manage.py runserver
 
 ### Entities
 
-| Entity | Description |
-|---|---|
-| `User` | A registered user who generates songs on the platform |
-| `Song` | A generated song owned by a user, carrying its generation lifecycle status |
-| `Library` | A personal collection of songs owned by a user (one per user) |
-| `SongPrompt` | The creative input (occasion, mood, singer tone) that defines a song |
-| `AIGenerationRequest` | A record of the AI generation job triggered by a prompt |
-| `SharedSong` | A shareable link produced when a user shares a song publicly |
-| `PlaybackSession` | Tracks playback state (position, loop points, equalizer) for a song |
-| `Draft` | A saved draft snapshot of a song before final submission |
+| Entity                | Description                                                                |
+| --------------------- | -------------------------------------------------------------------------- |
+| `User`                | A registered user who generates songs on the platform                      |
+| `Song`                | A generated song owned by a user, carrying its generation lifecycle status |
+| `Library`             | A personal collection of songs owned by a user (one per user)              |
+| `SongPrompt`          | The creative input (occasion, mood, singer tone) that defines a song       |
+| `AIGenerationRequest` | A record of the AI generation job triggered by a prompt                    |
+| `SharedSong`          | A shareable link produced when a user shares a song publicly               |
+| `PlaybackSession`     | Tracks playback state (position, loop points, equalizer) for a song        |
+| `Draft`               | A saved draft snapshot of a song before final submission                   |
 
 ### Enumerations
 
-| Enum | Values |
-|---|---|
-| `GenerationStatus` | `IN_PROGRESS`, `COMPLETED`, `FAILED`, `DRAFT` |
-| `Occasion` | `BIRTHDAY`, `WEDDING`, `ANNIVERSARY`, `GRADUATION`, `GENERAL` |
-| `MoodTone` | `HAPPY`, `SAD`, `ROMANTIC`, `ENERGETIC`, `CALM` |
-| `SingerTone` | `MALE_DEEP`, `MALE_LIGHT`, `FEMALE_DEEP`, `FEMALE_LIGHT`, `NEUTRAL` |
+| Enum               | Values                                                              |
+| ------------------ | ------------------------------------------------------------------- |
+| `GenerationStatus` | `IN_PROGRESS`, `COMPLETED`, `FAILED`, `DRAFT`                       |
+| `Occasion`         | `BIRTHDAY`, `WEDDING`, `ANNIVERSARY`, `GRADUATION`, `GENERAL`       |
+| `MoodTone`         | `HAPPY`, `SAD`, `ROMANTIC`, `ENERGETIC`, `CALM`                     |
+| `SingerTone`       | `MALE_DEEP`, `MALE_LIGHT`, `FEMALE_DEEP`, `FEMALE_LIGHT`, `NEUTRAL` |
 
 ### Relationships
 
-| Relationship | Type |
-|---|---|
-| User → Song | One-to-many (a user generates many songs) |
-| User → Library | One-to-one (a user owns exactly one library) |
-| Library → Song | Many-to-many (a library contains many songs) |
-| Song → SongPrompt | One-to-one (a song is defined by one prompt) |
+| Relationship                     | Type                                                  |
+| -------------------------------- | ----------------------------------------------------- |
+| User → Song                      | One-to-many (a user generates many songs)             |
+| User → Library                   | One-to-one (a user owns exactly one library)          |
+| Library → Song                   | Many-to-many (a library contains many songs)          |
+| Song → SongPrompt                | One-to-one (a song is defined by one prompt)          |
 | SongPrompt → AIGenerationRequest | One-to-one (a prompt triggers one generation request) |
-| Song → SharedSong | One-to-one (a song can be shared once) |
-| Song → PlaybackSession | Many-to-one (many songs can be played in one session) |
-| Song → Draft | One-to-many (a song can have multiple draft saves) |
+| Song → SharedSong                | One-to-one (a song can be shared once)                |
+| Song → PlaybackSession           | Many-to-one (many songs can be played in one session) |
+| Song → Draft                     | One-to-many (a song can have multiple draft saves)    |
 
 ---
 
@@ -86,18 +87,19 @@ Full Create, Read, Update, and Delete operations are implemented as a JSON REST 
 
 ### API Endpoints
 
-| Endpoint | Entity |
-|---|---|
-| `/api/users/` | User |
-| `/api/songs/` | Song |
-| `/api/libraries/` | Library |
-| `/api/song-prompts/` | SongPrompt |
+| Endpoint                    | Entity              |
+| --------------------------- | ------------------- |
+| `/api/users/`               | User                |
+| `/api/songs/`               | Song                |
+| `/api/libraries/`           | Library             |
+| `/api/song-prompts/`        | SongPrompt          |
 | `/api/generation-requests/` | AIGenerationRequest |
-| `/api/shared-songs/` | SharedSong |
-| `/api/playback-sessions/` | PlaybackSession |
-| `/api/drafts/` | Draft |
+| `/api/shared-songs/`        | SharedSong          |
+| `/api/playback-sessions/`   | PlaybackSession     |
+| `/api/drafts/`              | Draft               |
 
 Each endpoint supports:
+
 - `GET /api/{entity}/` — list all records
 - `POST /api/{entity}/` — create a new record
 - `GET /api/{entity}/{id}/` — retrieve a single record
@@ -108,6 +110,7 @@ Each endpoint supports:
 ### Example Operations
 
 **Create a User**
+
 ```bash
 curl -X POST http://127.0.0.1:8000/api/users/ \
   -H "Content-Type: application/json" \
@@ -115,6 +118,7 @@ curl -X POST http://127.0.0.1:8000/api/users/ \
 ```
 
 **Create a Song**
+
 ```bash
 curl -X POST http://127.0.0.1:8000/api/songs/ \
   -H "Content-Type: application/json" \
@@ -122,6 +126,7 @@ curl -X POST http://127.0.0.1:8000/api/songs/ \
 ```
 
 **Update a Song's status**
+
 ```bash
 curl -X PATCH http://127.0.0.1:8000/api/songs/1/ \
   -H "Content-Type: application/json" \
@@ -129,11 +134,13 @@ curl -X PATCH http://127.0.0.1:8000/api/songs/1/ \
 ```
 
 **Delete a Song**
+
 ```bash
 curl -X DELETE http://127.0.0.1:8000/api/songs/1/
 ```
 
 **Read all Songs for a User**
+
 ```bash
 curl http://127.0.0.1:8000/api/users/1/songs/
 ```
