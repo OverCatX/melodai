@@ -1,9 +1,5 @@
 """
-Domain layer tests – Exercise 3, Task 3.
-
-Verifies that the database schema accurately reflects the domain model:
-every entity can be created, retrieved, updated and deleted, and every
-relationship / constraint behaves as specified in the UML class diagram.
+Tests for the songs app.
 """
 
 from django.test import TestCase
@@ -24,11 +20,6 @@ from .models import (
     PlaybackSession,
     Draft,
 )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def make_user(email="test@example.com", display_name="Test User"):
@@ -59,11 +50,6 @@ def make_prompt(song):
     )
 
 
-# ---------------------------------------------------------------------------
-# Enumeration tests
-# ---------------------------------------------------------------------------
-
-
 class EnumerationTests(TestCase):
 
     def test_generation_status_values(self):
@@ -82,11 +68,6 @@ class EnumerationTests(TestCase):
     def test_singer_tone_values(self):
         expected = {"MALE_DEEP", "MALE_LIGHT", "FEMALE_DEEP", "FEMALE_LIGHT", "NEUTRAL"}
         self.assertEqual({c.value for c in SingerTone}, expected)
-
-
-# ---------------------------------------------------------------------------
-# User CRUD
-# ---------------------------------------------------------------------------
 
 
 class UserTests(TestCase):
@@ -117,11 +98,6 @@ class UserTests(TestCase):
         make_song(user)
         user.delete()
         self.assertEqual(Song.objects.count(), 0)
-
-
-# ---------------------------------------------------------------------------
-# Song CRUD & constraints
-# ---------------------------------------------------------------------------
 
 
 class SongTests(TestCase):
@@ -157,11 +133,6 @@ class SongTests(TestCase):
         song_pk = song.pk
         song.delete()
         self.assertFalse(Song.objects.filter(pk=song_pk).exists())
-
-
-# ---------------------------------------------------------------------------
-# Library – User owns one Library (1..1), contains Songs (0..*)
-# ---------------------------------------------------------------------------
 
 
 class LibraryTests(TestCase):
@@ -202,11 +173,6 @@ class LibraryTests(TestCase):
         self.assertEqual(Library.objects.count(), 0)
 
 
-# ---------------------------------------------------------------------------
-# SongPrompt – defines Song (1..1)
-# ---------------------------------------------------------------------------
-
-
 class SongPromptTests(TestCase):
 
     def setUp(self):
@@ -238,11 +204,6 @@ class SongPromptTests(TestCase):
         make_prompt(self.song)
         self.assertTrue(hasattr(self.song, "prompt"))
         self.assertEqual(self.song.prompt.occasion, Occasion.BIRTHDAY)
-
-
-# ---------------------------------------------------------------------------
-# AIGenerationRequest – SongPrompt triggers request (1..1)
-# ---------------------------------------------------------------------------
 
 
 class AIGenerationRequestTests(TestCase):
@@ -281,11 +242,6 @@ class AIGenerationRequestTests(TestCase):
         self.assertEqual(AIGenerationRequest.objects.count(), 0)
 
 
-# ---------------------------------------------------------------------------
-# SharedSong – Song produces SharedSong (0..1)
-# ---------------------------------------------------------------------------
-
-
 class SharedSongTests(TestCase):
 
     def setUp(self):
@@ -317,11 +273,6 @@ class SharedSongTests(TestCase):
         SharedSong.objects.create(song=self.song, share_link="https://example.com/x")
         self.song.delete()
         self.assertEqual(SharedSong.objects.count(), 0)
-
-
-# ---------------------------------------------------------------------------
-# PlaybackSession – Song played via PlaybackSession (0..1 per Song)
-# ---------------------------------------------------------------------------
 
 
 class PlaybackSessionTests(TestCase):
@@ -362,11 +313,6 @@ class PlaybackSessionTests(TestCase):
         session.delete()
         song.refresh_from_db()
         self.assertIsNone(song.playback_session)
-
-
-# ---------------------------------------------------------------------------
-# Draft – Song saved as Draft (0..*)
-# ---------------------------------------------------------------------------
 
 
 class DraftTests(TestCase):
