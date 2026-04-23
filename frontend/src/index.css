@@ -8,12 +8,12 @@
   --text-primary: #f8f8f8;
   --text-secondary: #a1a1aa;
   
-  --accent-color: #7c3aed; /* Violet/Purple accent */
-  --accent-hover: #8b5cf6;
-  --accent-glow: rgba(124, 58, 237, 0.4);
+  --accent-color: #f97316; /* Orange accent */
+  --accent-hover: #ea580c;
+  --accent-glow: rgba(249, 115, 22, 0.4);
   
   --border-color: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(124, 58, 237, 0.5);
+  --border-focus: rgba(249, 115, 22, 0.5);
   
   --error-color: #ef4444;
   --success-color: #10b981;
@@ -172,9 +172,9 @@ p {
 }
 
 @keyframes pulse-glow {
-  0% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(124, 58, 237, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
 }
 
 .animate-pulse-glow {

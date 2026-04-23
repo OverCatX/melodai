@@ -1,8 +1,10 @@
+from django.core.exceptions import ImproperlyConfigured
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..models import Song, SongPrompt
+from ..generation.service import refresh_generation_status
+from ..models import AIGenerationRequest, Song, SongPrompt
 from ..serializers import DraftSerializer, SongPromptSerializer, SongSerializer
 
 
@@ -39,3 +41,25 @@ class SongViewSet(viewsets.ModelViewSet):
         song = self.get_object()
         serializer = DraftSerializer(song.drafts.all(), many=True)
         return Response(serializer.data)
+    @action(detail=True, methods=["post"], url_path="sync-status")
+    def sync_status(self, request, pk=None):
+        """POST /api/songs/{id}/sync-status/ — trigger status refresh for the latest generation request."""
+        song = self.get_object()
+        # Find the latest request for this song
+        ai_request = AIGenerationRequest.objects.filter(prompt__song=song).order_by("-id").first()
+        if not ai_request:
+            return Response({"detail": "No generation request found for this song."}, status=status.HTTP_404_NOT_FOUND)
+        
+        if ai_request.status == "COMPLETED":
+            return Response(self.get_serializer(song).data)
+
+        try:
+            refresh_generation_status(ai_request)
+        except ImproperlyConfigured as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError as exc:
+            # Already completed or no external id
+            pass
+            
+        song.refresh_from_db()
+        return Response(self.get_serializer(song).data)

@@ -123,4 +123,12 @@ def refresh_generation_status(ai_request: AIGenerationRequest) -> AIGenerationRe
     ai_request.status = GenerationStatus.IN_PROGRESS
     ai_request.error_message = ""
     ai_request.save(update_fields=["external_status", "status", "error_message"])
+
+    # Ensure the song status is also updated to IN_PROGRESS so it's not stuck as DRAFT in library
+    song = ai_request.prompt.song
+    if song.generation_status != GenerationStatus.IN_PROGRESS:
+        song.generation_status = GenerationStatus.IN_PROGRESS
+        song.is_draft = False
+        song.save(update_fields=["generation_status", "is_draft"])
+
     return ai_request
