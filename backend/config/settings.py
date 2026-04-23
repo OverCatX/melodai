@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -47,6 +48,11 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
+    ],
+    # Course scope: no authenticated users; avoids browser CSRF requirements on JSON API.
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
     ],
 }
 
@@ -132,3 +138,16 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Song generation (Strategy pattern) ---
+# GENERATOR_STRATEGY: "mock" (offline) | "suno" (api.sunoapi.org)
+GENERATOR_STRATEGY = os.environ.get("GENERATOR_STRATEGY", "mock").strip().lower()
+SUNO_API_KEY = os.environ.get("SUNO_API_KEY", "").strip()
+SUNO_API_BASE_URL = os.environ.get(
+    "SUNO_API_BASE_URL", "https://api.sunoapi.org"
+).strip()
+SUNO_MODEL = os.environ.get("SUNO_MODEL", "V4_5ALL").strip()
+# Required by Suno "Generate Music" API; polling is used instead of handling callbacks.
+SUNO_CALLBACK_URL = os.environ.get(
+    "SUNO_CALLBACK_URL", "https://example.com/suno-callback-placeholder"
+).strip()

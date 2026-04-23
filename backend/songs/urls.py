@@ -1,4 +1,6 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
+
 from .views import (
     UserViewSet,
     SongViewSet,
@@ -9,6 +11,7 @@ from .views import (
     PlaybackSessionViewSet,
     DraftViewSet,
 )
+from .views.generation_config import generation_config
 
 router = DefaultRouter()
 router.register("users", UserViewSet, basename="user")
@@ -24,4 +27,6 @@ router.register(
 )
 router.register("drafts", DraftViewSet, basename="draft")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("generation-config/", generation_config, name="generation-config"),
+] + router.urls
