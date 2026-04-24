@@ -44,16 +44,12 @@ class Command(BaseCommand):
         # Users
         # ------------------------------------------------------------------
         alice = User.objects.create(
-            google_id="google_alice_001",
-            email="alice@example.com",
+            username="alice",
             display_name="Alice Nguyen",
-            session_token="tok_alice_abc",
         )
         bob = User.objects.create(
-            google_id="google_bob_002",
-            email="bob@example.com",
+            username="bob",
             display_name="Bob Smith",
-            session_token="tok_bob_xyz",
         )
         self.stdout.write(f"  Created users: {alice}, {bob}")
 

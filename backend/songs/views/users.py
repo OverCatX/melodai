@@ -21,30 +21,32 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
 
     def get_queryset(self):
-        """Support ?google_id=xxx filter for frontend lookup."""
+        """Support ?username=xxx filter."""
         qs = super().get_queryset()
-        google_id = self.request.query_params.get("google_id")
-        if google_id:
-            qs = qs.filter(google_id=google_id)
+        username = self.request.query_params.get("username")
+        if username:
+            qs = qs.filter(username=username)
         return qs
 
     @action(detail=False, methods=["post"], url_path="get-or-create")
     def get_or_create(self, request):
         """
         POST /api/users/get-or-create/
-        Body: {google_id, email, display_name, session_token}
-        Returns the existing user or creates a new one. Never errors on duplicate.
+        Body: {"username": "xxx"}          (required)
+              {"username": "xxx", "display_name": "My Name"}  (optional)
+        Returns existing user or creates a new one. Never errors on duplicate.
         """
-        google_id = request.data.get("google_id", "").strip()
-        if not google_id:
-            return Response({"detail": "google_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+        username = (request.data.get("username") or "").strip()
+        if not username:
+            return Response(
+                {"detail": "username is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         user, created = User.objects.get_or_create(
-            google_id=google_id,
+            username=username,
             defaults={
-                "email": request.data.get("email", f"{google_id}@local.dev"),
-                "display_name": request.data.get("display_name", google_id),
-                "session_token": request.data.get("session_token", ""),
+                "display_name": request.data.get("display_name", username),
             },
         )
         serializer = self.get_serializer(user)

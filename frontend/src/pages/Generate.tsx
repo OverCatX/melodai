@@ -41,12 +41,7 @@ const Generate: React.FC = () => {
 
     try {
       // Always fetch a fresh real DB id — avoids stale localStorage issues
-      const user = await getOrCreateUser({
-        google_id: stored.google_id || `local_${stored.username?.toLowerCase().replace(/\s+/g, '_')}`,
-        email: `${(stored.google_id || stored.username || 'user').toLowerCase()}@local.dev`,
-        display_name: stored.username || 'User',
-        session_token: `tok_${Date.now()}`,
-      });
+      const user = await getOrCreateUser({ username: stored.username || 'user' });
 
       // Step 1: Create Song
       const song = await createSong({ user_id: user.id, title, generation_status: 'DRAFT', is_draft: true });

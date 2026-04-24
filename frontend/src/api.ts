@@ -13,12 +13,10 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 // --- Users ---
 /** Always returns a valid user — creates one or returns the existing one. */
 export function getOrCreateUser(payload: {
-  google_id: string;
-  email: string;
-  display_name: string;
-  session_token: string;
+  username: string;
+  display_name?: string;
 }) {
-  return apiFetch<{ id: number; user_id: string; display_name: string }>('/users/get-or-create/', {
+  return apiFetch<{ id: number; user_id: string; username: string; display_name: string }>('/users/get-or-create/', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

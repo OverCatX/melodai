@@ -40,10 +40,8 @@ class Command(BaseCommand):
 
         suffix = uuid.uuid4().hex[:8]
         user = User.objects.create(
-            google_id=f"google_demo_gen_{suffix}",
-            email=f"demo_gen_{suffix}@example.com",
+            username=f"demo_gen_{suffix}",
             display_name="Demo Gen",
-            session_token="demo",
         )
         song = Song.objects.create(
             user=user,

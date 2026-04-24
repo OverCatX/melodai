@@ -13,8 +13,8 @@ from .models import (
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ("display_name", "email", "google_id")
-    search_fields = ("display_name", "email", "google_id")
+    list_display = ("username", "display_name")
+    search_fields = ("username", "display_name")
     readonly_fields = ("user_id",)
 
 

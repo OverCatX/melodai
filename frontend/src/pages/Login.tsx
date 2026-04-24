@@ -6,7 +6,6 @@ import { getOrCreateUser } from '../api';
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,18 +15,9 @@ const Login: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    const google_id = `local_${username.trim().toLowerCase().replace(/\s+/g, '_')}`;
-    const resolvedEmail = email.trim() || `${google_id}@local.dev`;
-
     try {
-      const user = await getOrCreateUser({
-        google_id,
-        email: resolvedEmail,
-        display_name: username.trim(),
-        session_token: `tok_${Date.now()}`,
-      });
-      // Store only the username — real DB id is fetched fresh each time it's needed
-      localStorage.setItem('user', JSON.stringify({ username: user.display_name, google_id }));
+      const user = await getOrCreateUser({ username: username.trim() });
+      localStorage.setItem('user', JSON.stringify({ username: user.username }));
       navigate('/generate');
     } catch (err: any) {
       setError(err.message || 'Could not connect to the server. Make sure the backend is running at http://127.0.0.1:8000');
@@ -88,18 +78,6 @@ const Login: React.FC = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-              Email <span style={{ opacity: 0.5 }}>(optional)</span>
-            </label>
-            <input
-              type="email"
-              className="input-field"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
           <button

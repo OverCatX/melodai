@@ -46,10 +46,12 @@ python manage.py seed                              # optional: load sample data
 python manage.py runserver
 ```
 
+
 | URL                            | Purpose       |
 | ------------------------------ | ------------- |
 | `http://127.0.0.1:8000/api/`   | JSON REST API |
 | `http://127.0.0.1:8000/admin/` | Django Admin  |
+
 
 ### Frontend
 
@@ -89,6 +91,7 @@ SUNO_API_KEY=your_bearer_token_here
 
 The generation layer uses the **Strategy Pattern** so that generation behavior can be swapped without changing any other part of the system.
 
+
 | Component          | File                                  | Role                                                                            |
 | ------------------ | ------------------------------------- | ------------------------------------------------------------------------------- |
 | Strategy Interface | `songs/generation/base.py`            | `SongGenerationStrategy` (ABC) with `generate()` + `fetch_status()`             |
@@ -97,234 +100,208 @@ The generation layer uses the **Strategy Pattern** so that generation behavior c
 | Factory            | `songs/generation/factory.py`         | Reads `GENERATOR_STRATEGY` from env/settings, instantiates the correct strategy |
 | Service            | `songs/generation/service.py`         | Orchestrates `run_generation()` and `refresh_generation_status()`               |
 
+
 **Strategy is selected via environment variable — selection is centralized in `factory.py` with no scattered `if/else` across the codebase.**
 
 ---
 
 ## Testing Guide
 
-> **Prerequisites:** Backend server must be running at `http://127.0.0.1:8000`.
->
-> Set a base URL for convenience:
->
-> ```bash
-> export BASE=http://127.0.0.1:8000/api
-> ```
+Make sure the backend is running at `http://127.0.0.1:8000` before you start.
 
-All examples below use `curl`. You can also use the **Django Admin** or tools like **Postman / HTTPie**.
+---
 
-### Step 0: Create the Required Data Chain
+### Option 1 — Management Command (Easiest, Mock only)
 
-Both Mock and Suno require the same chain: **User → Song → SongPrompt → AIGenerationRequest**.
-Run these once, then substitute the returned IDs.
+One command. No setup needed.
 
-**1. Create or retrieve a User**
+```bash
+cd backend
+python manage.py demo_generation
+```
 
-Use the `get-or-create` endpoint — safe to call multiple times with the same `google_id`.
+Expected output:
+
+```
+Active strategy: MockSongGeneratorStrategy
+external_task_id='mock-xxxxxxxxxxxxxxxx'
+external_status='SUCCESS'
+ai_status=COMPLETED
+song.generation_status=COMPLETED
+song.audio_file_url='https://...'
+```
+
+---
+
+### Option 2 — Web UI (Recommended for full flow)
+
+The frontend supports both Mock and Suno with no extra setup.
+
+1. Start both servers (backend + frontend)
+2. Open `http://localhost:5173` and log in
+3. Click the **Mock / Suno badge** in the top-right to switch strategy
+4. Go to **Create Music**, fill in the form, and click **Generate**
+5. Check **My Library** to see the result — use the 🔄 button to sync status if needed
+
+---
+
+### Option 3 — Browsable API (No curl needed)
+
+Django REST Framework provides a built-in web interface for every endpoint.
+
+Open any of these in your browser:
+
+
+| URL                                                        | What you can do         |
+| ---------------------------------------------------------- | ----------------------- |
+| `http://127.0.0.1:8000/api/`                               | Browse all endpoints    |
+| `http://127.0.0.1:8000/api/generation-config/`             | Check/switch strategy   |
+| `http://127.0.0.1:8000/api/generation-requests/`           | List or create requests |
+| `http://127.0.0.1:8000/api/generation-requests/{id}/run/`  | Trigger generation      |
+| `http://127.0.0.1:8000/api/generation-requests/{id}/poll/` | Poll status             |
+
+
+Each page has an HTML form — just fill in the JSON body and click **POST**.
+
+---
+
+### Option 4 — curl / Postman (Advanced)
+
+Run each step in order. Copy the `id` from each response and export it before the next step.
+
+```bash
+export BASE=http://127.0.0.1:8000/api
+```
+
+---
+
+**Step 1 — Create a user**
 
 ```bash
 curl -s -X POST "$BASE/users/get-or-create/" \
   -H "Content-Type: application/json" \
-  -d '{
-    "google_id": "test_user_001",
-    "email": "test@example.com",
-    "display_name": "Test User",
-    "session_token": "token123"
-  }' | python3 -m json.tool
+  -d '{"username":"testuser"}' \
+  | python3 -m json.tool
 ```
 
-> Note the returned `"id"` → set `USER_ID=<id>`
+```json
+{
+    "id": 15,
+    "user_id": "b86846ae-...",
+    "username": "testuser",
+    "display_name": "testuser"
+}
+```
 
-**2. Create a Song**
+```bash
+export USER_ID=<id from response above>   # use the number (e.g. 15), NOT the UUID
+```
+
+---
+
+**Step 2 — Create a song**
 
 ```bash
 curl -s -X POST "$BASE/songs/" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"user_id\": $USER_ID,
-    \"title\": \"My Test Song\",
-    \"generation_status\": \"DRAFT\",
-    \"is_draft\": true
-  }" | python3 -m json.tool
+  -d "{\"user_id\":$USER_ID,\"title\":\"My Song\",\"generation_status\":\"DRAFT\",\"is_draft\":true}" \
+  | python3 -m json.tool
 ```
 
-> Note the returned `"id"` → set `SONG_ID=<id>`
+```bash
+export SONG_ID=<id from response above>   # use the number, NOT song_id UUID
+```
 
-**3. Create a Song Prompt**
+---
 
-Valid enum values:
-
-- `occasion`: `BIRTHDAY` | `WEDDING` | `ANNIVERSARY` | `GRADUATION` | `GENERAL`
-- `mood_and_tone`: `HAPPY` | `SAD` | `ROMANTIC` | `ENERGETIC` | `CALM`
-- `singer_tone`: `MALE_DEEP` | `MALE_LIGHT` | `FEMALE_DEEP` | `FEMALE_LIGHT` | `NEUTRAL`
+**Step 3 — Create a prompt**
 
 ```bash
 curl -s -X POST "$BASE/song-prompts/" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"song_id\": $SONG_ID,
-    \"title\": \"A Calm Birthday Song\",
-    \"occasion\": \"BIRTHDAY\",
-    \"mood_and_tone\": \"CALM\",
-    \"singer_tone\": \"NEUTRAL\",
-    \"description\": \"A relaxing birthday song for my friend\"
-  }" | python3 -m json.tool
+  -d "{\"song_id\":$SONG_ID,\"title\":\"Birthday Song\",\"occasion\":\"BIRTHDAY\",\"mood_and_tone\":\"HAPPY\",\"singer_tone\":\"NEUTRAL\",\"description\":\"\"}" \
+  | python3 -m json.tool
 ```
 
-> Note the returned `"id"` → set `PROMPT_ID=<id>`
+Valid values — `occasion`: BIRTHDAY · WEDDING · ANNIVERSARY · GRADUATION · GENERAL | `mood_and_tone`: HAPPY · SAD · ROMANTIC · ENERGETIC · CALM | `singer_tone`: MALE_DEEP · MALE_LIGHT · FEMALE_DEEP · FEMALE_LIGHT · NEUTRAL
 
-**4. Create an AIGenerationRequest**
+```bash
+export PROMPT_ID=<id from response above>   # use the number, NOT prompt_id UUID
+```
+
+---
+
+**Step 4 — Create a generation request**
 
 ```bash
 curl -s -X POST "$BASE/generation-requests/" \
   -H "Content-Type: application/json" \
-  -d "{\"prompt_id\": $PROMPT_ID}" | python3 -m json.tool
+  -d "{\"prompt_id\":$PROMPT_ID}" \
+  | python3 -m json.tool
 ```
 
-> Note the returned `"id"` → set `REQ_ID=<id>`
->
-> WARNING: If you see `409 Conflict`, a request already exists for this prompt. Use the `"id"` from the response instead.
+> If you get `409 Conflict`, the request already exists — use the `id` from the response.
+
+```bash
+export REQ_ID=<id from response above>   # use the number (e.g. 29), NOT request_id UUID
+```
 
 ---
 
-### Mock Mode (Offline)
+**Step 5 — Switch strategy, then run generation**
 
-**No API key needed. Completes instantly.**
-
-**Step 1 — Set strategy to Mock**
-
+**For Mock** (no API key needed):
 ```bash
-# Option A: in .env
-GENERATOR_STRATEGY=mock
-
-# Option B: environment variable (then restart server)
-export GENERATOR_STRATEGY=mock
-
-# Option C: runtime override (no restart needed)
+# Switch to mock
 curl -s -X POST "$BASE/generation-config/" \
   -H "Content-Type: application/json" \
-  -d '{"generator_strategy": "mock"}'
-```
+  -d '{"generator_strategy":"mock"}' | python3 -m json.tool
 
-**Step 2 — Verify active strategy**
-
-```bash
-curl -s "$BASE/generation-config/" | python3 -m json.tool
-```
-
-Expected output:
-
-```json
-{
-  "generator_strategy": "mock",
-  "strategy_source": "environment",
-  "suno_api_configured": false
-}
-```
-
-**Step 3 — Run generation**
-
-```bash
+# Run — completes immediately
 curl -s -X POST "$BASE/generation-requests/$REQ_ID/run/" \
   -H "Content-Type: application/json" \
   -d '{}' | python3 -m json.tool
 ```
-
-Expected result:
-
-- `"status": "COMPLETED"`
-- `"external_task_id"` starts with `mock-`
-- `"external_status": "SUCCESS"`
-
-**Step 4 — (Optional) Quick demo via management command**
-
-```bash
-python manage.py demo_generation           # runs a full generation cycle
-python manage.py demo_generation --skip-run  # only prints active strategy
-```
+Expected: `"status": "COMPLETED"`, `"external_task_id": "mock-..."`
 
 ---
 
-### Suno Mode (Live API)
-
-**Requires a real Suno API key and internet access.**
-
-**Step 1 — Configure API key**
-
+**For Suno** (requires `SUNO_API_KEY` in `.env`):
 ```bash
-# In .env (recommended):
-GENERATOR_STRATEGY=suno
-SUNO_API_KEY=your_bearer_token_here
-```
+# Switch to suno
+curl -s -X POST "$BASE/generation-config/" \
+  -H "Content-Type: application/json" \
+  -d '{"generator_strategy":"suno"}' | python3 -m json.tool
 
-Then restart the server: `python manage.py runserver`
-
-**Step 2 — Verify active strategy**
-
-```bash
-curl -s "$BASE/generation-config/" | python3 -m json.tool
-```
-
-Expected output:
-
-```json
-{
-  "generator_strategy": "suno",
-  "strategy_source": "environment",
-  "suno_api_configured": true
-}
-```
-
-**Step 3 — Start generation (creates Suno task)**
-
-Use the same `REQ_ID` from Step 0, or create a new chain.
-
-```bash
+# Run — returns IN_PROGRESS with a taskId
 curl -s -X POST "$BASE/generation-requests/$REQ_ID/run/" \
   -H "Content-Type: application/json" \
   -d '{}' | python3 -m json.tool
-```
 
-Expected result:
-
-- `"status": "IN_PROGRESS"`
-- `"external_task_id"` — Suno's task ID (non-empty)
-- `"external_status": "PENDING"`
-
-**Step 4 — Poll for completion**
-
-Repeat until `status` is `COMPLETED` or `FAILED`.
-
-```bash
+# Poll until status = SUCCESS (repeat every few seconds)
 curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
   -H "Content-Type: application/json" \
   -d '{}' | python3 -m json.tool
+# PENDING → TEXT_SUCCESS → FIRST_SUCCESS → SUCCESS
 ```
 
-Suno status progression: `PENDING` → `TEXT_SUCCESS` → `FIRST_SUCCESS` → `SUCCESS`
+**Switch strategy at runtime (no restart):**
 
-When `SUCCESS`, the related song will have `audio_file_url` populated.
 
-> **No key configured?** The `run` endpoint returns a clear 400 error — there is no silent fallback to Mock.
+| Action                 | Request                                                           |
+| ---------------------- | ----------------------------------------------------------------- |
+| Check current strategy | `GET /api/generation-config/`                                     |
+| Switch to Mock         | `POST /api/generation-config/` `{"generator_strategy": "mock"}`   |
+| Switch to Suno         | `POST /api/generation-config/` `{"generator_strategy": "suno"}`   |
+| Revert to `.env`       | `POST /api/generation-config/` `{"clear_runtime_override": true}` |
 
----
-
-### Switching Strategy at Runtime
-
-You can switch strategies **without restarting the server** using the config endpoint.
-
-| Action                                     | Request                                                           |
-| ------------------------------------------ | ----------------------------------------------------------------- |
-| Check current strategy                     | `GET /api/generation-config/`                                     |
-| Switch to Mock                             | `POST /api/generation-config/` `{"generator_strategy": "mock"}`   |
-| Switch to Suno                             | `POST /api/generation-config/` `{"generator_strategy": "suno"}`   |
-| Clear runtime override (revert to env var) | `POST /api/generation-config/` `{"clear_runtime_override": true}` |
 
 ---
 
 ## REST API Reference
 
 ### Resources
+
 
 | Endpoint                    | Resource            | Methods                       |
 | --------------------------- | ------------------- | ----------------------------- |
@@ -337,19 +314,24 @@ You can switch strategies **without restarting the server** using the config end
 | `/api/playback-sessions/`   | PlaybackSession     | GET, POST, PUT, PATCH, DELETE |
 | `/api/drafts/`              | Draft               | GET, POST, PUT, PATCH, DELETE |
 
+
 ### Generation Actions
 
-| Endpoint                              | Method | Description                                    |
-| ------------------------------------- | ------ | ---------------------------------------------- |
-| `/api/generation-requests/{id}/run/`  | POST   | Execute generation with current strategy       |
-| `/api/generation-requests/{id}/poll/` | POST   | Poll external task status (Suno `record-info`) |
-| `/api/generation-config/`             | GET    | View current active strategy and its source    |
-| `/api/generation-config/`             | POST   | Switch or clear strategy at runtime            |
+
+| Endpoint                              | Method | Description                                        |
+| ------------------------------------- | ------ | -------------------------------------------------- |
+| `/api/users/get-or-create/`           | POST   | Create or retrieve user by `username`              |
+| `/api/generation-requests/{id}/run/`  | POST   | Execute generation with current strategy           |
+| `/api/generation-requests/{id}/poll/` | POST   | Poll Suno task status (`record-info`)              |
+| `/api/songs/{id}/sync-status/`        | POST   | Re-sync song status from latest generation request |
+| `/api/generation-config/`             | GET    | View current strategy + source + suno key status   |
+| `/api/generation-config/`             | POST   | Switch strategy or clear runtime override          |
+
 
 ---
 
 ## Domain Model
 
-![Domain model](domain_model.png)
+Domain model
 
 Full field definitions and relationships are in `backend/songs/models/`.
