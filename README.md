@@ -1,4 +1,4 @@
-# AI Song Domain
+# Melodai Ai Song Generation
 
 A Django REST API for AI-powered song generation, implementing the **Strategy Pattern** to support multiple interchangeable generation backends — **Mock** (offline, instant) and **Suno** (real external API).
 
@@ -46,12 +46,10 @@ python manage.py seed                              # optional: load sample data
 python manage.py runserver
 ```
 
-
 | URL                            | Purpose       |
 | ------------------------------ | ------------- |
 | `http://127.0.0.1:8000/api/`   | JSON REST API |
 | `http://127.0.0.1:8000/admin/` | Django Admin  |
-
 
 ### Frontend
 
@@ -91,7 +89,6 @@ SUNO_API_KEY=your_bearer_token_here
 
 The generation layer uses the **Strategy Pattern** so that generation behavior can be swapped without changing any other part of the system.
 
-
 | Component          | File                                  | Role                                                                            |
 | ------------------ | ------------------------------------- | ------------------------------------------------------------------------------- |
 | Strategy Interface | `songs/generation/base.py`            | `SongGenerationStrategy` (ABC) with `generate()` + `fetch_status()`             |
@@ -99,7 +96,6 @@ The generation layer uses the **Strategy Pattern** so that generation behavior c
 | Suno Strategy      | `songs/generation/strategies/suno.py` | Calls Suno API, returns a `taskId` for polling                                  |
 | Factory            | `songs/generation/factory.py`         | Reads `GENERATOR_STRATEGY` from env/settings, instantiates the correct strategy |
 | Service            | `songs/generation/service.py`         | Orchestrates `run_generation()` and `refresh_generation_status()`               |
-
 
 **Strategy is selected via environment variable — selection is centralized in `factory.py` with no scattered `if/else` across the codebase.**
 
@@ -151,7 +147,6 @@ Django REST Framework provides a built-in web interface for every endpoint.
 
 Open any of these in your browser:
 
-
 | URL                                                        | What you can do         |
 | ---------------------------------------------------------- | ----------------------- |
 | `http://127.0.0.1:8000/api/`                               | Browse all endpoints    |
@@ -159,7 +154,6 @@ Open any of these in your browser:
 | `http://127.0.0.1:8000/api/generation-requests/`           | List or create requests |
 | `http://127.0.0.1:8000/api/generation-requests/{id}/run/`  | Trigger generation      |
 | `http://127.0.0.1:8000/api/generation-requests/{id}/poll/` | Poll status             |
-
 
 Each page has an HTML form — just fill in the JSON body and click **POST**.
 
@@ -186,10 +180,10 @@ curl -s -X POST "$BASE/users/get-or-create/" \
 
 ```json
 {
-    "id": 15,
-    "user_id": "b86846ae-...",
-    "username": "testuser",
-    "display_name": "testuser"
+  "id": 15,
+  "user_id": "b86846ae-...",
+  "username": "testuser",
+  "display_name": "testuser"
 }
 ```
 
@@ -251,6 +245,7 @@ export REQ_ID=<id from response above>   # use the number (e.g. 29), NOT request
 **Step 5 — Switch strategy, then run generation**
 
 **For Mock** (no API key needed):
+
 ```bash
 # Switch to mock
 curl -s -X POST "$BASE/generation-config/" \
@@ -262,11 +257,13 @@ curl -s -X POST "$BASE/generation-requests/$REQ_ID/run/" \
   -H "Content-Type: application/json" \
   -d '{}' | python3 -m json.tool
 ```
+
 Expected: `"status": "COMPLETED"`, `"external_task_id": "mock-..."`
 
 ---
 
 **For Suno** (requires `SUNO_API_KEY` in `.env`):
+
 ```bash
 # Switch to suno
 curl -s -X POST "$BASE/generation-config/" \
@@ -287,7 +284,6 @@ curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
 
 **Switch strategy at runtime (no restart):**
 
-
 | Action                 | Request                                                           |
 | ---------------------- | ----------------------------------------------------------------- |
 | Check current strategy | `GET /api/generation-config/`                                     |
@@ -295,13 +291,11 @@ curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
 | Switch to Suno         | `POST /api/generation-config/` `{"generator_strategy": "suno"}`   |
 | Revert to `.env`       | `POST /api/generation-config/` `{"clear_runtime_override": true}` |
 
-
 ---
 
 ## REST API Reference
 
 ### Resources
-
 
 | Endpoint                    | Resource            | Methods                       |
 | --------------------------- | ------------------- | ----------------------------- |
@@ -314,9 +308,7 @@ curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
 | `/api/playback-sessions/`   | PlaybackSession     | GET, POST, PUT, PATCH, DELETE |
 | `/api/drafts/`              | Draft               | GET, POST, PUT, PATCH, DELETE |
 
-
 ### Generation Actions
-
 
 | Endpoint                              | Method | Description                                        |
 | ------------------------------------- | ------ | -------------------------------------------------- |
@@ -326,7 +318,6 @@ curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
 | `/api/songs/{id}/sync-status/`        | POST   | Re-sync song status from latest generation request |
 | `/api/generation-config/`             | GET    | View current strategy + source + suno key status   |
 | `/api/generation-config/`             | POST   | Switch strategy or clear runtime override          |
-
 
 ---
 
