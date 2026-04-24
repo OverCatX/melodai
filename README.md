@@ -1,4 +1,4 @@
-# AI Song Domain
+# Melodai Ai Song Generation
 
 A Django REST API for AI-powered song generation, implementing the **Strategy Pattern** to support multiple interchangeable generation backends — **Mock** (offline, instant) and **Suno** (real external API).
 
