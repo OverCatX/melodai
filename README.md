@@ -332,6 +332,6 @@ curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
 
 ## Domain Model
 
-Domain model
+![Domain Model](domain_model.png)
 
 Full field definitions and relationships are in `backend/songs/models/`.
