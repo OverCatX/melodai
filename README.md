@@ -64,9 +64,9 @@ python3 manage.py runserver
 
 Keep this terminal open. The API will be at:
 
-| URL | Purpose |
-| --- | --- |
-| `http://127.0.0.1:8000/api/` | JSON REST API |
+| URL                            | Purpose                                                |
+| ------------------------------ | ------------------------------------------------------ |
+| `http://127.0.0.1:8000/api/`   | JSON REST API                                          |
 | `http://127.0.0.1:8000/admin/` | Django Admin (create a superuser first if you need it) |
 
 ### 3. Frontend (Vite + React)
@@ -111,7 +111,6 @@ SUNO_API_KEY=your_bearer_token_here
 
 The generation layer uses the **Strategy Pattern** so that generation behavior can be swapped without changing any other part of the system.
 
-
 | Component          | File                                  | Role                                                                            |
 | ------------------ | ------------------------------------- | ------------------------------------------------------------------------------- |
 | Strategy Interface | `songs/generation/base.py`            | `SongGenerationStrategy` (ABC) with `generate()` + `fetch_status()`             |
@@ -119,7 +118,6 @@ The generation layer uses the **Strategy Pattern** so that generation behavior c
 | Suno Strategy      | `songs/generation/strategies/suno.py` | Calls Suno API, returns a `taskId` for polling                                  |
 | Factory            | `songs/generation/factory.py`         | Reads `GENERATOR_STRATEGY` from env/settings, instantiates the correct strategy |
 | Service            | `songs/generation/service.py`         | Orchestrates `run_generation()` and `refresh_generation_status()`               |
-
 
 **Strategy is selected via environment variable — selection is centralized in `factory.py` with no scattered `if/else` across the codebase.**
 
@@ -272,15 +270,13 @@ curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
 
 Wait until `run` / `stream` finishes with `status: COMPLETED`, then download.
 
-
-| Value         | Where to get it                                                                                                 |
-| ------------- | --------------------------------------------------------------------------------------------------------------- |
-| `**SONG_ID`** | The `song_id` field in the last JSON line (**not** the generation request’s `"id"`), or the song id from Step 2 |
-| `**USER_ID`** | Your user’s numeric `id` from Step 1 (same account that owns the song)                                          |
-
+| Value           | Where to get it                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------- |
+| `**SONG_ID`\*\* | The `song_id` field in the last JSON line (**not** the generation request’s `"id"`), or the song id from Step 2 |
+| `**USER_ID`\*\* | Your user’s numeric `id` from Step 1 (same account that owns the song)                                          |
 
 **Web UI:** use Download — the app adds `?user_id` for you.  
-`**curl`:** you must add `?user_id=$USER_ID` or the server returns **404**.
+`**curl`:** you must add `?user_id=$USER_ID` or the server returns **404\*\*.
 
 ```bash
 export USER_ID=<from Step 1>
@@ -292,14 +288,12 @@ The file is saved in the directory where you run `curl` (often `~`); or use e.g.
 
 **Switch strategy at runtime (no restart):**
 
-
 | Action                 | Request                                                           |
 | ---------------------- | ----------------------------------------------------------------- |
 | Check current strategy | `GET /api/generation-config/`                                     |
 | Switch to Mock         | `POST /api/generation-config/` `{"generator_strategy": "mock"}`   |
 | Switch to Suno         | `POST /api/generation-config/` `{"generator_strategy": "suno"}`   |
 | Revert to `.env`       | `POST /api/generation-config/` `{"clear_runtime_override": true}` |
-
 
 ---
 
@@ -322,7 +316,6 @@ Django REST Framework provides a built-in web interface for every endpoint.
 
 Open any of these in your browser:
 
-
 | URL                                                        | What you can do                                         |
 | ---------------------------------------------------------- | ------------------------------------------------------- |
 | `http://127.0.0.1:8000/api/`                               | Browse all endpoints                                    |
@@ -331,7 +324,6 @@ Open any of these in your browser:
 | `http://127.0.0.1:8000/api/generation-requests/{id}/run/`  | Trigger generation                                      |
 | `http://127.0.0.1:8000/api/generation-requests/{id}/poll/` | Poll status                                             |
 | `http://127.0.0.1:8000/api/songs/{id}/download/?user_id=`  | Download audio (GET; set `user_id` to the song’s owner) |
-
 
 Download is a **GET** that returns a binary file — see **Option 1, Step 6** for a `curl` example. Most other links in the table are POST and show an HTML form in DRF.
 
@@ -363,7 +355,6 @@ song.audio_file_url='https://...'
 
 ### Resources
 
-
 | Endpoint                    | Resource            | Methods                                                                                                                                       |
 | --------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/api/users/`               | User                | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
@@ -375,9 +366,7 @@ song.audio_file_url='https://...'
 | `/api/playback-sessions/`   | PlaybackSession     | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
 | `/api/drafts/`              | Draft               | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
 
-
 ### Generation Actions
-
 
 | Endpoint                              | Method | Description                                                                                               |
 | ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
@@ -389,11 +378,10 @@ song.audio_file_url='https://...'
 | `/api/generation-config/`             | GET    | View current strategy + source + suno key status                                                          |
 | `/api/generation-config/`             | POST   | Switch strategy or clear runtime override                                                                 |
 
-
 ---
 
 ## Domain Model
 
-Domain Model
+![MeloDAI domain model](domain_model.png)
 
 Full field definitions and relationships are in `backend/songs/models/`.
