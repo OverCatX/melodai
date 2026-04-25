@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useOutletContext, useNavigate, Link } from 'react-router-dom';
 import { Wand2, CheckCircle2, CircleDashed, Loader2, Play, Download, Save, AlertCircle, Library } from 'lucide-react';
-import { createSong, getSong, createPrompt, createGenerationRequest, runGeneration, pollGeneration, getOrCreateUser, downloadSongFile } from '../api';
+import { createSong, getSong, createPrompt, createGenerationRequest, runGeneration, pollGeneration, downloadSongFile } from '../api';
 
 type Step = 'idle' | 'creating' | 'generating' | 'polling' | 'done' | 'error';
 
@@ -30,24 +30,33 @@ const Generate: React.FC = () => {
   const [generatedSongId, setGeneratedSongId] = useState<number | null>(null);
   const [downloadBusy, setDownloadBusy] = useState(false);
 
-  const getUser = () => {
+  const getUser = (): { id: number; session_token: string } | null => {
     const data = localStorage.getItem('user');
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+    try {
+      const o = JSON.parse(data) as { id?: number; session_token?: string };
+      if (typeof o.id !== 'number' || o.id <= 0 || !o.session_token) return null;
+      return { id: o.id, session_token: o.session_token };
+    } catch {
+      return null;
+    }
   };
 
   const handleGenerate = async () => {
     const stored = getUser();
-    if (!stored || !title.trim() || currentStep !== 'idle') return;
+    if (!title.trim() || currentStep !== 'idle') return;
+    if (!stored) {
+      setErrorMsg('Please sign in with Google from the login page.');
+      navigate('/login');
+      return;
+    }
     setCurrentStep('creating');
     setErrorMsg('');
     setGeneratedSongId(null);
 
     try {
-      // Always fetch a fresh real DB id — avoids stale localStorage issues
-      const user = await getOrCreateUser({ username: stored.username || 'user' });
-
       // Step 1: Create Song
-      const song = await createSong({ user_id: user.id, title, generation_status: 'DRAFT', is_draft: true });
+      const song = await createSong({ user_id: stored.id, title, generation_status: 'DRAFT', is_draft: true });
       setGeneratedSongId(song.id);
 
       // Step 2: Create Prompt

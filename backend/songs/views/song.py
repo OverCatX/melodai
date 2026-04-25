@@ -5,10 +5,11 @@ from django.core.exceptions import ImproperlyConfigured
 from django.http import StreamingHttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from ..generation.service import refresh_generation_status
-from ..models import AIGenerationRequest, Song, SongPrompt
+from ..models import AIGenerationRequest, Song, SongPrompt, User
 from ..serializers import DraftSerializer, SongPromptSerializer, SongSerializer
 
 _FILENAME_SAFE = re.compile(r"[^\w\s\-._]", re.UNICODE)
@@ -38,6 +39,16 @@ class SongViewSet(viewsets.ModelViewSet):
         qs = Song.objects.select_related("user", "playback_session").all()
         if getattr(self, "action", None) == "create":
             return qs
+        u = self.request.user
+        if isinstance(u, User) and u.is_authenticated:
+            raw = self.request.query_params.get("user_id")
+            if raw is not None and str(raw).strip() != "":
+                try:
+                    if int(raw) != u.id:
+                        return Song.objects.none()
+                except (TypeError, ValueError):
+                    return Song.objects.none()
+            return qs.filter(user_id=u.id)
         raw = self.request.query_params.get("user_id")
         if raw is not None and str(raw).strip() != "":
             try:
@@ -45,6 +56,14 @@ class SongViewSet(viewsets.ModelViewSet):
             except (TypeError, ValueError):
                 return Song.objects.none()
         return Song.objects.none()
+
+    def perform_create(self, serializer):
+        u = self.request.user
+        if isinstance(u, User) and u.is_authenticated:
+            target = serializer.validated_data.get("user")
+            if target is not None and target.id != u.id:
+                raise PermissionDenied("Cannot create songs for another user.")
+        serializer.save()
 
     @action(detail=True, methods=["get"], url_path="prompt")
     def prompt(self, request, pk=None):

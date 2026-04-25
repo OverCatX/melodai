@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Music, Wand2, Library, LogOut, Play, Pause,
-  SkipForward, Repeat, FlaskConical, Zap, X, CheckCircle2, AlertCircle, Volume2
+  FlaskConical, Zap, X, CheckCircle2, AlertCircle, Volume2
 } from 'lucide-react';
 import { getGenerationConfig, setGenerationStrategy } from '../api';
 
@@ -133,7 +133,11 @@ export interface NowPlaying { title: string; url: string }
 const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [user, setUser] = useState<{ username: string } | null>(null);
+  const [user, setUser] = useState<{
+    username: string;
+    display_name?: string;
+    email?: string;
+  } | null>(null);
 
   // ── strategy ──
   const [strategy, setStrategy] = useState<'mock' | 'suno'>('mock');
@@ -150,7 +154,21 @@ const Layout: React.FC = () => {
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
-    if (!userData) { navigate('/login'); } else { setUser(JSON.parse(userData)); }
+    if (!userData) {
+      navigate('/login');
+      return;
+    }
+    try {
+      const p = JSON.parse(userData) as { session_token?: string; id?: number };
+      if (!p.session_token || typeof p.id !== 'number') {
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
+      setUser(JSON.parse(userData));
+    } catch {
+      navigate('/login');
+    }
     getGenerationConfig()
       .then(cfg => { setStrategy(cfg.generator_strategy as 'mock' | 'suno'); setSunoConfigured(cfg.suno_api_configured); })
       .catch(() => {});
@@ -287,7 +305,9 @@ const Layout: React.FC = () => {
             {strategy === 'mock' ? <FlaskConical size={14} /> : <Zap size={14} />}
             {strategy === 'mock' ? 'Mock' : 'Suno'}
           </button>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Hello, {user?.username}</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            Hello, {user?.display_name || user?.email || user?.username}
+          </span>
           <button onClick={handleLogout} style={{
             display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)',
             padding: '0.5rem 1rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border-color)',

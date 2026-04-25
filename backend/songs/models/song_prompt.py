@@ -1,7 +1,9 @@
 import uuid
 from django.db import models
 
-from .enums import Occasion, MoodTone, SingerTone
+from .mood_tone import MoodTone
+from .occasion import Occasion
+from .singer_tone import SingerTone
 from .song import Song
 
 

@@ -1,44 +1,80 @@
 const BASE_URL = 'http://127.0.0.1:8000/api';
 
+function getSessionTokenFromStorage(): string | undefined {
+  const raw = localStorage.getItem('user');
+  if (!raw) return undefined;
+  try {
+    const u = JSON.parse(raw) as { session_token?: string };
+    return u.session_token;
+  } catch {
+    return undefined;
+  }
+}
+
+function buildJsonHeaders(options?: RequestInit, includeAuth = true): Headers {
+  const h = new Headers();
+  h.set('Content-Type', 'application/json');
+  if (includeAuth) {
+    const t = getSessionTokenFromStorage();
+    if (t) h.set('Authorization', `Bearer ${t}`);
+  }
+  if (options?.headers) {
+    const o = new Headers(options.headers);
+    o.forEach((v, k) => h.set(k, v));
+  }
+  return h;
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: buildJsonHeaders(options, true),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
   return data as T;
 }
 
-// --- Users ---
-/** Always returns a valid user — creates one or returns the existing one. */
-export function getOrCreateUser(payload: {
-  username: string;
-  display_name?: string;
-}) {
-  return apiFetch<{ id: number; user_id: string; username: string; display_name: string }>('/users/get-or-create/', {
+// --- Auth ---
+/** Public: Google OAuth Web client id from backend (so VITE_GOOGLE_CLIENT_ID is optional). */
+export function getAuthConfig() {
+  return apiFetch<{ google_client_id: string }>('/auth/config/');
+}
+
+/** Google Sign-In: exchange ID token for app user + session token (set same client ID as backend). */
+export function authGoogle(idToken: string) {
+  return apiFetch<{
+    id: number;
+    user_id: string;
+    username: string;
+    display_name: string;
+    email: string;
+    session_token: string;
+  }>('/auth/google/', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ id_token: idToken }),
   });
 }
 
-// --- Songs (scoped by user: DB already has user FK; API filters by `user_id`) ---
+// --- Songs (scoped by user: sign-in is Google only; `user` in localStorage must include id + session_token) ---
 
-/** Current user’s numeric id (from localStorage, or get-or-create from username). */
+/** Logged-in user’s numeric `id` (Google session in localStorage). */
 export async function resolveUserId(): Promise<number> {
   const raw = localStorage.getItem('user');
-  if (!raw) throw new Error('Not logged in');
-  let u: { username?: string; id?: number };
+  if (!raw) throw new Error('Not logged in; sign in with Google.');
+  let u: { id?: number; session_token?: string };
   try {
     u = JSON.parse(raw);
   } catch {
     throw new Error('Invalid session');
   }
-  if (typeof u.id === 'number' && u.id > 0) return u.id;
-  if (!u.username) throw new Error('Not logged in');
-  const fresh = await getOrCreateUser({ username: u.username });
-  localStorage.setItem('user', JSON.stringify({ username: fresh.username, id: fresh.id }));
-  return fresh.id;
+  if (typeof u.id !== 'number' || u.id <= 0) {
+    throw new Error('Not logged in; sign in with Google.');
+  }
+  if (!u.session_token) {
+    throw new Error('Session expired; sign in with Google again.');
+  }
+  return u.id;
 }
 
 function songsQuery(userId: number) {
@@ -86,7 +122,10 @@ export async function updateSong(id: number, payload: Partial<{ is_favorite: boo
 
 export async function deleteSong(id: number) {
   const userId = await resolveUserId();
-  const res = await fetch(`${BASE_URL}/songs/${id}/${songsQuery(userId)}`, { method: 'DELETE' });
+  const res = await fetch(`${BASE_URL}/songs/${id}/${songsQuery(userId)}`, {
+    method: 'DELETE',
+    headers: buildJsonHeaders(undefined, true),
+  });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error((data as { detail?: string }).detail || `Delete failed (${res.status})`);
@@ -117,7 +156,7 @@ export async function downloadSongFile(songId: number, title: string) {
   const userId = await resolveUserId();
   const res = await fetch(
     `${BASE_URL}/songs/${songId}/download/${songsQuery(userId)}`,
-    { method: 'GET' }
+    { method: 'GET', headers: buildJsonHeaders(undefined, true) }
   );
   const contentType = res.headers.get('Content-Type') || '';
   let ext = '.mp3';
@@ -174,7 +213,7 @@ export function createGenerationRequest(prompt_id: number) {
   });
 }
 
-export function getGenerationRequestForSong(songId: number) {
+export function getGenerationRequestForSong(_songId: number) {
   // We'll need to find the prompt first, then the request. 
   // For simplicity, let's assume the backend can filter generation requests by song_id if we added it, 
   // but for now we'll just list them and filter client-side or add an endpoint.
@@ -227,7 +266,10 @@ export function listDrafts() {
 }
 
 export function deleteDraft(id: number) {
-  return fetch(`${BASE_URL}/drafts/${id}/`, { method: 'DELETE' });
+  return fetch(`${BASE_URL}/drafts/${id}/`, {
+    method: 'DELETE',
+    headers: buildJsonHeaders(undefined, true),
+  });
 }
 
 // --- Shared Songs ---

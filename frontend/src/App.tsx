@@ -9,13 +9,12 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
-        
-        {/* Protected Routes wrapped in Layout */}
+
         <Route element={<Layout />}>
           <Route path="/generate" element={<Generate />} />
           <Route path="/library" element={<Library />} />
         </Route>
-        
+
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>

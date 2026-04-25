@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 
 from ..base import SongGenerationStrategy
-from ..types import SongGenerationRequest, SongGenerationResult
+from ..song_generation_request import SongGenerationRequest
+from ..song_generation_result import SongGenerationResult
 
 
 MOCK_AUDIO_URL = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/audio/dummy-audio.mp3"

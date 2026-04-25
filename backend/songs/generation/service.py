@@ -4,7 +4,7 @@ from django.db import transaction
 
 from ..models import AIGenerationRequest, GenerationStatus, SongPrompt
 from .factory import get_song_generator_strategy
-from .types import SongGenerationRequest
+from .song_generation_request import SongGenerationRequest
 
 
 def build_prompt_text(prompt: SongPrompt) -> str:

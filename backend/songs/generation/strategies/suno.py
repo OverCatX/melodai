@@ -6,7 +6,8 @@ import requests
 from django.conf import settings
 
 from ..base import SongGenerationStrategy
-from ..types import SongGenerationRequest, SongGenerationResult
+from ..song_generation_request import SongGenerationRequest
+from ..song_generation_result import SongGenerationResult
 
 
 class SunoSongGeneratorStrategy(SongGenerationStrategy):

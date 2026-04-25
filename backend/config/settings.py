@@ -56,8 +56,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
     ],
-    # Course scope: no authenticated users; avoids browser CSRF requirements on JSON API.
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "songs.authentication.BearerSessionAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
@@ -165,3 +166,10 @@ SUNO_MODEL = os.environ.get("SUNO_MODEL", "V4_5ALL").strip()
 SUNO_CALLBACK_URL = os.environ.get(
     "SUNO_CALLBACK_URL", "https://example.com/suno-callback-placeholder"
 ).strip()
+
+# Google Sign-In: Web client ID (must match the frontend gapi client; used to verify id_token).
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "").strip()
+# When False (default), POST /api/users/get-or-create/ is disabled; sign-in is Google only.
+# Set to true only for local curl/Postman testing without a browser.
+_ALLOW_RAW = os.environ.get("ALLOW_DISPLAY_NAME_GET_OR_CREATE", "").strip().lower()
+ALLOW_DISPLAY_NAME_GET_OR_CREATE = _ALLOW_RAW in ("1", "true", "yes")

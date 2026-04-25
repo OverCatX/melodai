@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from .types import SongGenerationRequest, SongGenerationResult
+from .song_generation_request import SongGenerationRequest
+from .song_generation_result import SongGenerationResult
 
 
 class SongGenerationStrategy(ABC):

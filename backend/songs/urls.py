@@ -11,6 +11,7 @@ from .views import (
     PlaybackSessionViewSet,
     DraftViewSet,
 )
+from .views.auth_google import auth_config, auth_google
 from .views.generation_config import generation_config
 
 router = DefaultRouter()
@@ -28,5 +29,7 @@ router.register(
 router.register("drafts", DraftViewSet, basename="draft")
 
 urlpatterns = [
+    path("auth/config/", auth_config, name="auth-config"),
+    path("auth/google/", auth_google, name="auth-google"),
     path("generation-config/", generation_config, name="generation-config"),
 ] + router.urls

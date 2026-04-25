@@ -4,7 +4,8 @@ from .factory import (
     get_song_generator_strategy,
 )
 from .strategies import MOCK_AUDIO_URL, MockSongGeneratorStrategy, SunoSongGeneratorStrategy
-from .types import SongGenerationRequest, SongGenerationResult
+from .song_generation_request import SongGenerationRequest
+from .song_generation_result import SongGenerationResult
 
 __all__ = [
     "SongGenerationStrategy",

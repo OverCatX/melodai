@@ -1,7 +1,7 @@
 import uuid
 from django.db import models
 
-from .enums import GenerationStatus
+from .generation_status import GenerationStatus
 from .user import User
 from .playback_session import PlaybackSession
 

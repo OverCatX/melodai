@@ -1,11 +1,11 @@
-from .drafts import DraftViewSet
-from .generation_requests import AIGenerationRequestViewSet
-from .libraries import LibraryViewSet
-from .playback_sessions import PlaybackSessionViewSet
-from .prompts import SongPromptViewSet
-from .shared_songs import SharedSongViewSet
-from .songs import SongViewSet
-from .users import UserViewSet
+from .ai_generation_request import AIGenerationRequestViewSet
+from .draft import DraftViewSet
+from .library import LibraryViewSet
+from .playback_session import PlaybackSessionViewSet
+from .shared_song import SharedSongViewSet
+from .song import SongViewSet
+from .song_prompt import SongPromptViewSet
+from .user import UserViewSet
 
 __all__ = [
     "AIGenerationRequestViewSet",
