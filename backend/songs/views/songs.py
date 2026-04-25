@@ -1,4 +1,8 @@
+import re
+
+import requests
 from django.core.exceptions import ImproperlyConfigured
+from django.http import StreamingHttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,13 +11,21 @@ from ..generation.service import refresh_generation_status
 from ..models import AIGenerationRequest, Song, SongPrompt
 from ..serializers import DraftSerializer, SongPromptSerializer, SongSerializer
 
+_FILENAME_SAFE = re.compile(r"[^\w\s\-._]", re.UNICODE)
+
+
+def _safe_download_basename(name: str) -> str:
+    s = _FILENAME_SAFE.sub("", (name or "").strip())
+    s = s.replace(" ", "_") or "song"
+    return s[:200]
+
 
 class SongViewSet(viewsets.ModelViewSet):
     """
     CRUD for Song.
-    list   GET    /api/songs/
+    list   GET    /api/songs/   (empty without ?user_id=; prefer GET /api/users/{id}/songs/)
     create POST   /api/songs/
-    read   GET    /api/songs/{id}/
+    read   GET    /api/songs/{id}/?user_id=<owner>  — scoping: only the owning user’s row
     update PUT    /api/songs/{id}/
     patch  PATCH  /api/songs/{id}/
     delete DELETE /api/songs/{id}/
@@ -21,6 +33,18 @@ class SongViewSet(viewsets.ModelViewSet):
 
     queryset = Song.objects.select_related("user", "playback_session").all()
     serializer_class = SongSerializer
+
+    def get_queryset(self):
+        qs = Song.objects.select_related("user", "playback_session").all()
+        if getattr(self, "action", None) == "create":
+            return qs
+        raw = self.request.query_params.get("user_id")
+        if raw is not None and str(raw).strip() != "":
+            try:
+                return qs.filter(user_id=int(raw))
+            except (TypeError, ValueError):
+                return Song.objects.none()
+        return Song.objects.none()
 
     @action(detail=True, methods=["get"], url_path="prompt")
     def prompt(self, request, pk=None):
@@ -63,3 +87,57 @@ class SongViewSet(viewsets.ModelViewSet):
             
         song.refresh_from_db()
         return Response(self.get_serializer(song).data)
+
+    @action(detail=True, methods=["get"], url_path="download")
+    def download(self, request, pk=None):
+        """
+        GET /api/songs/{id}/download/ — stream audio from audio_file_url (Suno CDN) so the browser can save a file.
+        """
+        song = self.get_object()
+        src = (song.audio_file_url or "").strip()
+        if not src:
+            return Response(
+                {"detail": "No audio file is available for this song yet."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        try:
+            upstream = requests.get(src, stream=True, timeout=120)
+        except requests.RequestException as exc:
+            return Response(
+                {"detail": f"Could not fetch audio: {exc}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        if upstream.status_code != 200:
+            upstream.close()
+            return Response(
+                {"detail": f"Audio source returned HTTP {upstream.status_code}."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        content_type = upstream.headers.get("Content-Type", "audio/mpeg")
+        ext = ".mp3"
+        if "wav" in content_type.lower():
+            ext = ".wav"
+        elif "flac" in content_type.lower():
+            ext = ".flac"
+        elif "ogg" in content_type.lower() or "opus" in content_type.lower():
+            ext = ".ogg"
+        base = _safe_download_basename(song.title)
+        filename = f"{base}{ext}"
+
+        def stream():
+            try:
+                for chunk in upstream.iter_content(chunk_size=64 * 1024):
+                    if chunk:
+                        yield chunk
+            finally:
+                upstream.close()
+
+        resp = StreamingHttpResponse(
+            stream(),
+            content_type=content_type,
+        )
+        resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+        if cl := upstream.headers.get("Content-Length"):
+            resp["Content-Length"] = cl
+        return resp

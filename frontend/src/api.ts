@@ -22,7 +22,29 @@ export function getOrCreateUser(payload: {
   });
 }
 
-// --- Songs ---
+// --- Songs (scoped by user: DB already has user FK; API filters by `user_id`) ---
+
+/** Current user’s numeric id (from localStorage, or get-or-create from username). */
+export async function resolveUserId(): Promise<number> {
+  const raw = localStorage.getItem('user');
+  if (!raw) throw new Error('Not logged in');
+  let u: { username?: string; id?: number };
+  try {
+    u = JSON.parse(raw);
+  } catch {
+    throw new Error('Invalid session');
+  }
+  if (typeof u.id === 'number' && u.id > 0) return u.id;
+  if (!u.username) throw new Error('Not logged in');
+  const fresh = await getOrCreateUser({ username: u.username });
+  localStorage.setItem('user', JSON.stringify({ username: fresh.username, id: fresh.id }));
+  return fresh.id;
+}
+
+function songsQuery(userId: number) {
+  return `?user_id=${userId}`;
+}
+
 export function createSong(payload: {
   user_id: number;
   title: string;
@@ -35,39 +57,93 @@ export function createSong(payload: {
   );
 }
 
-export function getSong(id: number) {
+export async function getSong(id: number) {
+  const userId = await resolveUserId();
   return apiFetch<{
     id: number; song_id: string; title: string;
     audio_file_url: string | null; generation_status: string;
     created_at: string; is_favorite: boolean; is_draft: boolean;
-  }>(`/songs/${id}/`);
+  }>(`/songs/${id}/${songsQuery(userId)}`);
 }
 
-export function listSongs() {
+/** All songs for the logged-in user (via nested route). */
+export async function listSongs() {
+  const userId = await resolveUserId();
   return apiFetch<Array<{
     id: number; song_id: string; title: string;
     audio_file_url: string | null; generation_status: string;
     created_at: string; is_favorite: boolean; is_draft: boolean;
-  }>>('/songs/');
+  }>>(`/users/${userId}/songs/`);
 }
 
-export function updateSong(id: number, payload: Partial<{ is_favorite: boolean; is_draft: boolean }>) {
-  return apiFetch<{ id: number }>(`/songs/${id}/`, {
+export async function updateSong(id: number, payload: Partial<{ is_favorite: boolean; is_draft: boolean }>) {
+  const userId = await resolveUserId();
+  return apiFetch<{ id: number }>(`/songs/${id}/${songsQuery(userId)}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
 
-export function deleteSong(id: number) {
-  return fetch(`${BASE_URL}/songs/${id}/`, { method: 'DELETE' });
+export async function deleteSong(id: number) {
+  const userId = await resolveUserId();
+  const res = await fetch(`${BASE_URL}/songs/${id}/${songsQuery(userId)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { detail?: string }).detail || `Delete failed (${res.status})`);
+  }
 }
 
-export function syncSongStatus(id: number) {
+export async function syncSongStatus(id: number) {
+  const userId = await resolveUserId();
   return apiFetch<{
     id: number; song_id: string; title: string;
     audio_file_url: string | null; generation_status: string;
     created_at: string; is_favorite: boolean; is_draft: boolean;
-  }>(`/songs/${id}/sync-status/`, { method: 'POST' });
+  }>(`/songs/${id}/sync-status/${songsQuery(userId)}`, { method: 'POST' });
+}
+
+const SAFE_FILENAME = /[^\w\s\-._]/g;
+
+function safeDownloadFilename(title: string, ext: string) {
+  const base = (title || 'song')
+    .trim()
+    .replace(SAFE_FILENAME, '')
+    .replace(/\s+/g, '_') || 'song';
+  return `${base.slice(0, 200)}${ext.startsWith('.') ? ext : `.${ext}`}`;
+}
+
+/** Download audio via backend proxy (avoids CORS issues with Suno CDN). */
+export async function downloadSongFile(songId: number, title: string) {
+  const userId = await resolveUserId();
+  const res = await fetch(
+    `${BASE_URL}/songs/${songId}/download/${songsQuery(userId)}`,
+    { method: 'GET' }
+  );
+  const contentType = res.headers.get('Content-Type') || '';
+  let ext = '.mp3';
+  if (contentType.includes('wav')) ext = '.wav';
+  else if (contentType.includes('flac')) ext = '.flac';
+  else if (contentType.includes('ogg') || contentType.includes('opus')) ext = '.ogg';
+
+  if (!res.ok) {
+    let detail = 'Download failed';
+    try {
+      const err = await res.json();
+      detail = (err as { detail?: string }).detail || detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = safeDownloadFilename(title, ext);
+  a.rel = 'noopener';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // --- Song Prompts ---
@@ -87,7 +163,12 @@ export function createPrompt(payload: {
 
 // --- Generation Requests ---
 export function createGenerationRequest(prompt_id: number) {
-  return apiFetch<{ id: number; status: string; external_task_id: string }>('/generation-requests/', {
+  return apiFetch<{
+    id: number;
+    song_id: number;
+    status: string;
+    external_task_id: string;
+  }>('/generation-requests/', {
     method: 'POST',
     body: JSON.stringify({ prompt_id }),
   });
@@ -102,14 +183,26 @@ export function getGenerationRequestForSong(songId: number) {
 }
 
 export function runGeneration(req_id: number) {
-  return apiFetch<{ id: number; status: string; external_task_id: string; external_status: string }>(
+  return apiFetch<{
+    id: number;
+    song_id: number;
+    status: string;
+    external_task_id: string;
+    external_status: string;
+  }>(
     `/generation-requests/${req_id}/run/`,
     { method: 'POST', body: JSON.stringify({}) }
   );
 }
 
 export function pollGeneration(req_id: number) {
-  return apiFetch<{ id: number; status: string; external_task_id: string; external_status: string }>(
+  return apiFetch<{
+    id: number;
+    song_id: number;
+    status: string;
+    external_task_id: string;
+    external_status: string;
+  }>(
     `/generation-requests/${req_id}/poll/`,
     { method: 'POST', body: JSON.stringify({}) }
   );

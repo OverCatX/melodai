@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useOutletContext, useNavigate, Link } from 'react-router-dom';
-import { Wand2, CheckCircle2, CircleDashed, Loader2, Play, Save, AlertCircle, Library } from 'lucide-react';
-import { createSong, getSong, createPrompt, createGenerationRequest, runGeneration, pollGeneration, getOrCreateUser } from '../api';
+import { Wand2, CheckCircle2, CircleDashed, Loader2, Play, Download, Save, AlertCircle, Library } from 'lucide-react';
+import { createSong, getSong, createPrompt, createGenerationRequest, runGeneration, pollGeneration, getOrCreateUser, downloadSongFile } from '../api';
 
 type Step = 'idle' | 'creating' | 'generating' | 'polling' | 'done' | 'error';
 
@@ -27,6 +27,8 @@ const Generate: React.FC = () => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [generationStatus, setGenerationStatus] = useState('');
   const [activeGenReqId, setActiveGenReqId] = useState<number | null>(null);
+  const [generatedSongId, setGeneratedSongId] = useState<number | null>(null);
+  const [downloadBusy, setDownloadBusy] = useState(false);
 
   const getUser = () => {
     const data = localStorage.getItem('user');
@@ -38,6 +40,7 @@ const Generate: React.FC = () => {
     if (!stored || !title.trim() || currentStep !== 'idle') return;
     setCurrentStep('creating');
     setErrorMsg('');
+    setGeneratedSongId(null);
 
     try {
       // Always fetch a fresh real DB id — avoids stale localStorage issues
@@ -45,6 +48,7 @@ const Generate: React.FC = () => {
 
       // Step 1: Create Song
       const song = await createSong({ user_id: user.id, title, generation_status: 'DRAFT', is_draft: true });
+      setGeneratedSongId(song.id);
 
       // Step 2: Create Prompt
       const prompt = await createPrompt({
@@ -119,8 +123,10 @@ const Generate: React.FC = () => {
         if (pollResult.status === 'COMPLETED') {
           done = true;
           setCurrentStep('done');
-          // No need to setAudioUrl here as we might not have the song id easily, 
-          // but the user can go to Library.
+          if (generatedSongId != null) {
+            const updated = await getSong(generatedSongId);
+            setAudioUrl(updated.audio_file_url || null);
+          }
         } else if (pollResult.status === 'FAILED') {
           throw new Error(`Generation failed: ${pollResult.external_status}`);
         }
@@ -147,6 +153,18 @@ const Generate: React.FC = () => {
     setIsPlaying(true);
   };
 
+  const handleDownload = async () => {
+    if (generatedSongId == null) return;
+    setDownloadBusy(true);
+    try {
+      await downloadSongFile(generatedSongId, title);
+    } catch (e: any) {
+      alert(e?.message || 'Download failed');
+    } finally {
+      setDownloadBusy(false);
+    }
+  };
+
   const resetGeneration = () => {
     setCurrentStep('idle');
     setTitle('');
@@ -157,6 +175,8 @@ const Generate: React.FC = () => {
     setAudioUrl(null);
     setErrorMsg('');
     setGenerationStatus('');
+    setActiveGenReqId(null);
+    setGeneratedSongId(null);
   };
 
   const renderForm = () => (
@@ -354,9 +374,35 @@ const Generate: React.FC = () => {
                 Your browser does not support audio.
               </audio>
             </div>
-            <button onClick={handlePlaySong} className="btn-primary" style={{ width: '100%' }}>
-              <Play size={20} /> Play in Player
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '0.75rem' }}>
+              <button onClick={handlePlaySong} className="btn-primary" style={{ width: '100%' }}>
+                <Play size={20} /> Play in Player
+              </button>
+              {generatedSongId != null && (
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={downloadBusy}
+                  style={{
+                    width: '100%',
+                    padding: '0.85rem 1rem',
+                    borderRadius: 'var(--radius-pill)',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    cursor: downloadBusy ? 'wait' : 'pointer',
+                    opacity: downloadBusy ? 0.7 : 1,
+                  }}
+                >
+                  <Download size={20} />
+                  {downloadBusy ? 'Downloading…' : 'Download audio file'}
+                </button>
+              )}
+            </div>
           </>
         )}
         {!audioUrl && (

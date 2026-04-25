@@ -17,7 +17,10 @@ const Login: React.FC = () => {
 
     try {
       const user = await getOrCreateUser({ username: username.trim() });
-      localStorage.setItem('user', JSON.stringify({ username: user.username }));
+      localStorage.setItem(
+        'user',
+        JSON.stringify({ username: user.username, id: user.id })
+      );
       navigate('/generate');
     } catch (err: any) {
       setError(err.message || 'Could not connect to the server. Make sure the backend is running at http://127.0.0.1:8000');

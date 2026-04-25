@@ -46,10 +46,12 @@ python manage.py seed                              # optional: load sample data
 python manage.py runserver
 ```
 
+
 | URL                            | Purpose       |
 | ------------------------------ | ------------- |
 | `http://127.0.0.1:8000/api/`   | JSON REST API |
 | `http://127.0.0.1:8000/admin/` | Django Admin  |
+
 
 ### Frontend
 
@@ -63,8 +65,8 @@ Open `http://localhost:5173` in your browser.
 
 The frontend connects to the backend at `http://127.0.0.1:8000`. It has two pages:
 
-- **Create Music** — fill in a prompt, generate a song (Mock or Suno), and play it
-- **My Library** — view all generated songs, toggle favorites, delete
+- **Create Music** — fill in a prompt, generate a song (Mock or Suno), play it, and download the audio file when ready
+- **My Library** — view all generated songs, play, download, toggle favorites, delete
 
 The active generation strategy is shown in the top-right corner of the nav bar. Click it to toggle between Mock and Suno without restarting the server.
 
@@ -89,6 +91,7 @@ SUNO_API_KEY=your_bearer_token_here
 
 The generation layer uses the **Strategy Pattern** so that generation behavior can be swapped without changing any other part of the system.
 
+
 | Component          | File                                  | Role                                                                            |
 | ------------------ | ------------------------------------- | ------------------------------------------------------------------------------- |
 | Strategy Interface | `songs/generation/base.py`            | `SongGenerationStrategy` (ABC) with `generate()` + `fetch_status()`             |
@@ -97,69 +100,18 @@ The generation layer uses the **Strategy Pattern** so that generation behavior c
 | Factory            | `songs/generation/factory.py`         | Reads `GENERATOR_STRATEGY` from env/settings, instantiates the correct strategy |
 | Service            | `songs/generation/service.py`         | Orchestrates `run_generation()` and `refresh_generation_status()`               |
 
+
 **Strategy is selected via environment variable — selection is centralized in `factory.py` with no scattered `if/else` across the codebase.**
 
 ---
 
 ## Testing Guide
 
-Make sure the backend is running at `http://127.0.0.1:8000` before you start.
+Make sure the backend is running at `http://127.0.0.1:8000` before you start. **Option order here:** full **curl** walkthrough first, then the **web UI** and **browsable API**, and the **management command** last (quickest, Mock only).
 
 ---
 
-### Option 1 — Management Command (Easiest, Mock only)
-
-One command. No setup needed.
-
-```bash
-cd backend
-python manage.py demo_generation
-```
-
-Expected output:
-
-```
-Active strategy: MockSongGeneratorStrategy
-external_task_id='mock-xxxxxxxxxxxxxxxx'
-external_status='SUCCESS'
-ai_status=COMPLETED
-song.generation_status=COMPLETED
-song.audio_file_url='https://...'
-```
-
----
-
-### Option 2 — Web UI (Recommended for full flow)
-
-The frontend supports both Mock and Suno with no extra setup.
-
-1. Start both servers (backend + frontend)
-2. Open `http://localhost:5173` and log in
-3. Click the **Mock / Suno badge** in the top-right to switch strategy
-4. Go to **Create Music**, fill in the form, and click **Generate**
-5. Check **My Library** to see the result — use the 🔄 button to sync status if needed
-
----
-
-### Option 3 — Browsable API (No curl needed)
-
-Django REST Framework provides a built-in web interface for every endpoint.
-
-Open any of these in your browser:
-
-| URL                                                        | What you can do         |
-| ---------------------------------------------------------- | ----------------------- |
-| `http://127.0.0.1:8000/api/`                               | Browse all endpoints    |
-| `http://127.0.0.1:8000/api/generation-config/`             | Check/switch strategy   |
-| `http://127.0.0.1:8000/api/generation-requests/`           | List or create requests |
-| `http://127.0.0.1:8000/api/generation-requests/{id}/run/`  | Trigger generation      |
-| `http://127.0.0.1:8000/api/generation-requests/{id}/poll/` | Poll status             |
-
-Each page has an HTML form — just fill in the JSON body and click **POST**.
-
----
-
-### Option 4 — curl / Postman (Advanced)
+### Option 1 — curl / Postman (Advanced)
 
 Run each step in order. Copy the `id` from each response and export it before the next step.
 
@@ -269,20 +221,57 @@ Expected: `"status": "COMPLETED"`, `"external_task_id": "mock-..."`
 curl -s -X POST "$BASE/generation-config/" \
   -H "Content-Type: application/json" \
   -d '{"generator_strategy":"suno"}' | python3 -m json.tool
+```
 
+**Run with live poll lines in the terminal (one command, no shell script)** — add `?stream=1` and use `curl -N` (`--no-buffer`) so each `[poll] …` line appears as the server updates (waits up to 60×5s, same as the web UI). The **last line** is the same JSON a normal `run` would return; grab it with `tail -1`:
+
+```bash
+curl -N -s -X POST "$BASE/generation-requests/$REQ_ID/run/?stream=1" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+# [stream] …  →  [poll] 1/60 …  →  last line: full JSON
+# Only the JSON:  … | tail -1 | python3 -m json.tool
+```
+
+**Or** run and poll by hand (each call returns once):
+
+```bash
 # Run — returns IN_PROGRESS with a taskId
 curl -s -X POST "$BASE/generation-requests/$REQ_ID/run/" \
   -H "Content-Type: application/json" \
   -d '{}' | python3 -m json.tool
 
-# Poll until status = SUCCESS (repeat every few seconds)
+# Poll until status = COMPLETED (repeat every few seconds)
 curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
   -H "Content-Type: application/json" \
   -d '{}' | python3 -m json.tool
 # PENDING → TEXT_SUCCESS → FIRST_SUCCESS → SUCCESS
 ```
 
+**Step 6 — Download the MP3**
+
+Wait until `run` / `stream` finishes with `status: COMPLETED`, then download.
+
+
+| Value         | Where to get it                                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| `**SONG_ID`** | The `song_id` field in the last JSON line (**not** the generation request’s `"id"`), or the song id from Step 2 |
+| `**USER_ID`** | Your user’s numeric `id` from Step 1 (same account that owns the song)                                          |
+
+
+**Web UI:** use Download — the app adds `?user_id` for you.  
+`**curl`:** you must add `?user_id=$USER_ID` or the server returns **404**.
+
+```bash
+export USER_ID=<from Step 1>
+export SONG_ID=<from Step 2 or song_id in JSON>
+curl -fSL -o "my-song.mp3" "$BASE/songs/$SONG_ID/download/?user_id=$USER_ID"
+```
+
+The file is saved in the directory where you run `curl` (often `~`); or use e.g. `-o "$HOME/Downloads/my-song.mp3"`.
+
 **Switch strategy at runtime (no restart):**
+
 
 | Action                 | Request                                                           |
 | ---------------------- | ----------------------------------------------------------------- |
@@ -291,38 +280,100 @@ curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
 | Switch to Suno         | `POST /api/generation-config/` `{"generator_strategy": "suno"}`   |
 | Revert to `.env`       | `POST /api/generation-config/` `{"clear_runtime_override": true}` |
 
+
+---
+
+### Option 2 — Web UI (Recommended for full flow)
+
+The frontend supports both Mock and Suno with no extra setup.
+
+1. Start both servers (backend + frontend)
+2. Open `http://localhost:5173` and log in
+3. Click the **Mock / Suno badge** in the top-right to switch strategy
+4. Go to **Create Music**, fill in the form, and click **Generate**
+5. Check **My Library** to see the result — use the 🔄 button to sync status if needed
+6. **Download** — use **Download audio** on the result screen or the ⬇ action in **My Library**; the app attaches `user_id` and streams the file through the backend from the song’s `audio_file_url`
+
+---
+
+### Option 3 — Browsable API (No curl needed)
+
+Django REST Framework provides a built-in web interface for every endpoint.
+
+Open any of these in your browser:
+
+
+| URL                                                        | What you can do                                         |
+| ---------------------------------------------------------- | ------------------------------------------------------- |
+| `http://127.0.0.1:8000/api/`                               | Browse all endpoints                                    |
+| `http://127.0.0.1:8000/api/generation-config/`             | Check/switch strategy                                   |
+| `http://127.0.0.1:8000/api/generation-requests/`           | List or create requests                                 |
+| `http://127.0.0.1:8000/api/generation-requests/{id}/run/`  | Trigger generation                                      |
+| `http://127.0.0.1:8000/api/generation-requests/{id}/poll/` | Poll status                                             |
+| `http://127.0.0.1:8000/api/songs/{id}/download/?user_id=`  | Download audio (GET; set `user_id` to the song’s owner) |
+
+
+Download is a **GET** that returns a binary file — see **Option 1, Step 6** for a `curl` example. Most other links in the table are POST and show an HTML form in DRF.
+
+---
+
+### Option 4 — Management Command (Easiest, Mock only)
+
+One command. No full curl walkthrough needed.
+
+```bash
+cd backend
+python3 manage.py demo_generation
+```
+
+Expected output:
+
+```
+Active strategy: MockSongGeneratorStrategy
+external_task_id='mock-xxxxxxxxxxxxxxxx'
+external_status='SUCCESS'
+ai_status=COMPLETED
+song.generation_status=COMPLETED
+song.audio_file_url='https://...'
+```
+
 ---
 
 ## REST API Reference
 
 ### Resources
 
-| Endpoint                    | Resource            | Methods                       |
-| --------------------------- | ------------------- | ----------------------------- |
-| `/api/users/`               | User                | GET, POST, PUT, PATCH, DELETE |
-| `/api/songs/`               | Song                | GET, POST, PUT, PATCH, DELETE |
-| `/api/libraries/`           | Library             | GET, POST, PUT, PATCH, DELETE |
-| `/api/song-prompts/`        | SongPrompt          | GET, POST, PUT, PATCH, DELETE |
-| `/api/generation-requests/` | AIGenerationRequest | GET, POST, PUT, PATCH, DELETE |
-| `/api/shared-songs/`        | SharedSong          | GET, POST, PUT, PATCH, DELETE |
-| `/api/playback-sessions/`   | PlaybackSession     | GET, POST, PUT, PATCH, DELETE |
-| `/api/drafts/`              | Draft               | GET, POST, PUT, PATCH, DELETE |
+
+| Endpoint                    | Resource            | Methods                                                                                                                                       |
+| --------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/users/`               | User                | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
+| `/api/songs/`               | Song                | GET, POST, PUT, PATCH, DELETE (list/detail for reads & mutations use `?user_id=<owner>`; `GET /api/users/{id}/songs/` lists one user’s songs) |
+| `/api/libraries/`           | Library             | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
+| `/api/song-prompts/`        | SongPrompt          | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
+| `/api/generation-requests/` | AIGenerationRequest | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
+| `/api/shared-songs/`        | SharedSong          | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
+| `/api/playback-sessions/`   | PlaybackSession     | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
+| `/api/drafts/`              | Draft               | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
+
 
 ### Generation Actions
 
-| Endpoint                              | Method | Description                                        |
-| ------------------------------------- | ------ | -------------------------------------------------- |
-| `/api/users/get-or-create/`           | POST   | Create or retrieve user by `username`              |
-| `/api/generation-requests/{id}/run/`  | POST   | Execute generation with current strategy           |
-| `/api/generation-requests/{id}/poll/` | POST   | Poll Suno task status (`record-info`)              |
-| `/api/songs/{id}/sync-status/`        | POST   | Re-sync song status from latest generation request |
-| `/api/generation-config/`             | GET    | View current strategy + source + suno key status   |
-| `/api/generation-config/`             | POST   | Switch strategy or clear runtime override          |
+
+| Endpoint                              | Method | Description                                                                                               |
+| ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| `/api/users/get-or-create/`           | POST   | Create or retrieve user by `username`                                                                     |
+| `/api/generation-requests/{id}/run/`  | POST   | Execute generation; optional `?stream=1` streams poll lines (`text/plain`, last line JSON; use `curl -N`) |
+| `/api/generation-requests/{id}/poll/` | POST   | Poll Suno task status (`record-info`)                                                                     |
+| `/api/songs/{id}/sync-status/`        | POST   | Re-sync song status from latest generation request                                                        |
+| `/api/songs/{id}/download/`           | GET    | Stream download; requires `?user_id=` (song owner), same as other song detail routes                      |
+| `/api/generation-config/`             | GET    | View current strategy + source + suno key status                                                          |
+| `/api/generation-config/`             | POST   | Switch strategy or clear runtime override                                                                 |
+
 
 ---
 
 ## Domain Model
 
-![Domain Model](domain_model.png)
+Domain Model
 
 Full field definitions and relationships are in `backend/songs/models/`.

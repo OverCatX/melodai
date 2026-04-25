@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Play, Heart, Trash2, RefreshCw, Search, Music } from 'lucide-react';
-import { listSongs, updateSong, deleteSong, syncSongStatus } from '../api';
+import { Play, Heart, Trash2, RefreshCw, Search, Music, Download } from 'lucide-react';
+import { listSongs, updateSong, deleteSong, syncSongStatus, downloadSongFile } from '../api';
 
 const Library: React.FC = () => {
   const { setCurrentSong, setIsPlaying } = useOutletContext<any>();
@@ -9,6 +9,7 @@ const Library: React.FC = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const fetchSongs = async () => {
     setLoading(true);
@@ -40,6 +41,17 @@ const Library: React.FC = () => {
     if (!song.audio_file_url) return;
     setCurrentSong({ title: song.title, url: song.audio_file_url });
     setIsPlaying(true);
+  };
+
+  const handleDownload = async (song: { id: number; title: string }) => {
+    setDownloadingId(song.id);
+    try {
+      await downloadSongFile(song.id, song.title);
+    } catch (e: any) {
+      alert(e?.message || 'Download failed');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const handleSync = async (id: number) => {
@@ -123,8 +135,19 @@ const Library: React.FC = () => {
                           <RefreshCw size={18} />
                         </button>
                       )}
-                      {song.generation_status === 'COMPLETED' && (
-                        <button onClick={() => handlePlay(song)} style={{ padding: '0.5rem', color: 'var(--text-secondary)' }}><Play size={18} /></button>
+                      {song.generation_status === 'COMPLETED' && song.audio_file_url && (
+                        <>
+                          <button type="button" onClick={() => handlePlay(song)} title="Play" style={{ padding: '0.5rem', color: 'var(--text-secondary)' }}><Play size={18} /></button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(song)}
+                            title="Download"
+                            disabled={downloadingId === song.id}
+                            style={{ padding: '0.5rem', color: 'var(--text-secondary)', opacity: downloadingId === song.id ? 0.5 : 1 }}
+                          >
+                            <Download size={18} />
+                          </button>
+                        </>
                       )}
                       <button onClick={() => handleDelete(song.id)} style={{ padding: '0.5rem', color: 'var(--error-color)' }}><Trash2 size={18} /></button>
                     </div>

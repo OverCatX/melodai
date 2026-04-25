@@ -156,11 +156,18 @@ const Layout: React.FC = () => {
       .catch(() => {});
   }, [navigate]);
 
-  // Load & autoplay when nowPlaying changes
+  // Load & autoplay when nowPlaying changes; stop and clear audio when player is closed
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (!nowPlaying?.url) return;
+    if (!nowPlaying?.url) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+      setCurrentTime(0);
+      setDuration(0);
+      return;
+    }
     audio.src = nowPlaying.url;
     audio.load();
     audio.play().catch(() => {});
