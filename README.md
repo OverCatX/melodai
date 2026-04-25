@@ -6,8 +6,10 @@ A Django REST API for AI-powered song generation, implementing the **Strategy Pa
 
 ## Project Structure
 
+After `git clone`, your root folder is usually **`melodai/`** (this README uses that name; a ZIP may use a different folder name as long as it contains the folders below).
+
 ```
-ai-song-domain/
+melodai/
 ├── backend/                        # Django REST API
 │   ├── config/                     # Project settings & URLs
 │   ├── songs/
@@ -32,28 +34,44 @@ ai-song-domain/
 
 ## Setup
 
-**Requirements:** Python 3.11+, Node.js 18+
+**What you need:** [Git](https://git-scm.com/), **Python 3.11+**, **Node.js 18+** (and npm), and two terminal windows (one for the API, one for the web app).
 
-### Backend
+### 1. Get the project
+
+Clone the repository and go into the project folder (the folder name is `melodai` with the default clone command):
+
+```bash
+git clone https://github.com/OverCatX/melodai.git
+cd melodai
+```
+
+If you already downloaded the project as a ZIP, unzip it, then `cd` into the root folder that contains `backend/` and `frontend/`.
+
+All commands below are run from this **project root** (`melodai/`), unless noted.
+
+### 2. Backend (Django API)
 
 ```bash
 cd backend
-python3 -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env                               # then fill in values
-python manage.py migrate
-python manage.py seed                              # optional: load sample data
-python manage.py runserver
+cp .env.example .env              # copy then edit; see [Environment variables](#environment-variables) below
+python3 manage.py migrate
+python3 manage.py seed            # optional: sample data
+python3 manage.py runserver
 ```
 
+Keep this terminal open. The API will be at:
 
-| URL                            | Purpose       |
-| ------------------------------ | ------------- |
-| `http://127.0.0.1:8000/api/`   | JSON REST API |
-| `http://127.0.0.1:8000/admin/` | Django Admin  |
+| URL | Purpose |
+| --- | --- |
+| `http://127.0.0.1:8000/api/` | JSON REST API |
+| `http://127.0.0.1:8000/admin/` | Django Admin (create a superuser first if you need it) |
 
+### 3. Frontend (Vite + React)
 
-### Frontend
+Open a **second** terminal. If you are at the project root (`melodai/`):
 
 ```bash
 cd frontend
@@ -61,7 +79,9 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser.
+If you are still inside `backend/` from step 2, use `cd ../frontend` instead of `cd frontend`.
+
+Open **`http://localhost:5173`** in your browser.
 
 The frontend connects to the backend at `http://127.0.0.1:8000`. It has two pages:
 
