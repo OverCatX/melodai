@@ -1,15 +1,24 @@
 # Class diagram (UML)
 
-Views, service layer, factory, and **Strategy** implementations. DRF: `list` / `retrieve` / `create` / `update` / `destroy` map to the usual HTTP verbs. Source: `backend/songs/views/`, `backend/songs/generation/`, `songs/generation/service.py`, `songs/generation/factory.py`.
+**REST API + generation (Strategy pattern)** in `backend/songs/`. The diagram is easier to read in **three layers**:
 
-## Mermaid (source — safe to hand in as text / GitHub renders it)
+| Layer | What it is |
+|-------|------------|
+| **1. ViewSet** | `ModelViewSet` per resource (user, song, library, …) |
+| **2. Non-ViewSet routes** | `auth_config`, `auth_google`, `generation_config` — `@api_view` functions, not a `ViewSet` |
+| **3. Generation** | `SongGenerationStrategy` (Mock / Suno) + `factory.py` + `service.py` |
+
+Standard DRF `list` / `retrieve` / `create` / … map to HTTP as usual for each route.
+
+---
+
+## 1) All ViewSets
 
 ```mermaid
 classDiagram
   direction TB
-
   class ModelViewSet {
-    <<DRF>>
+    <<rest_framework ModelViewSet>>
   }
   class UserViewSet
   class SongViewSet
@@ -19,7 +28,6 @@ classDiagram
   class SharedSongViewSet
   class PlaybackSessionViewSet
   class DraftViewSet
-
   ModelViewSet <|-- UserViewSet
   ModelViewSet <|-- SongViewSet
   ModelViewSet <|-- LibraryViewSet
@@ -28,59 +36,70 @@ classDiagram
   ModelViewSet <|-- SharedSongViewSet
   ModelViewSet <|-- PlaybackSessionViewSet
   ModelViewSet <|-- DraftViewSet
+  note for AIGenerationRequestViewSet "actions: run, poll, stream"
+  note for SongViewSet "e.g. sync_status calls service"
+```
 
-  class "auth_config() @api_view" as AuthConfig
-  class "auth_google() @api_view" as AuthGoogle
-  class "generation_config() @api_view" as GenerationConfig
+**In the repo:** `views/user.py`, `song.py`, `library.py`, `song_prompt.py`, `ai_generation_request.py`, `shared_song.py`, `playback_session.py`, `draft.py` — re-exported from `views/__init__.py`.
 
-  class "service.py" as ServiceModule {
-    <<module>>
-    +run_generation()
-    +refresh_generation_status()
-  }
+---
 
-  class "factory.py" as FactoryModule {
-    <<module>>
-    +get_song_generator_strategy()
-    +create_song_generator_strategy()
-  }
+## 2) Function-based endpoints (not ViewSet)
 
+```mermaid
+classDiagram
+  direction TB
+  class auth_config
+  class auth_google
+  class generation_config
+  note for auth_config "auth_google.py GET /api/auth/config/"
+  note for auth_google "auth_google.py POST /api/auth/google/"
+  note for generation_config "generation_config.py GET+POST /api/generation-config/"
+```
+
+---
+
+## 3) Strategy + factory + service
+
+- **`factory.py`** reads `GENERATOR_STRATEGY` and any **runtime** override (via `generation_config`) and instantiates **Mock** or **Suno**.
+- **`service.py`** calls `get_song_generator_strategy()` then `generate` / updates **`Song`** and **`AIGenerationRequest`** — **strategies do not write the DB** themselves.
+- **`SunoSongGeneratorStrategy`** calls the provider with **`requests`**.
+
+```mermaid
+classDiagram
+  direction TB
   class SongGenerationStrategy {
-    <<Abstract>>
-    +generate() SongGenerationResult
-    +fetch_status() SongGenerationResult
+    <<abstract>>
+    +generate
+    +fetch_status
   }
   class MockSongGeneratorStrategy
   class SunoSongGeneratorStrategy
-
+  class serviceModule {
+    <<module>>
+  }
+  class factoryModule {
+    <<module>>
+  }
   SongGenerationStrategy <|-- MockSongGeneratorStrategy
   SongGenerationStrategy <|-- SunoSongGeneratorStrategy
-  FactoryModule ..> MockSongGeneratorStrategy
-  FactoryModule ..> SunoSongGeneratorStrategy
-
-  AIGenerationRequestViewSet ..> ServiceModule
-  SongViewSet ..> ServiceModule
-  ServiceModule ..> FactoryModule
-  ServiceModule ..> SongGenerationStrategy
-  GenerationConfig ..> FactoryModule
-
-  note for AuthConfig "GET /api/auth/config/"
-  note for AuthGoogle "POST /api/auth/google/"
-  note for AIGenerationRequestViewSet "run poll stream"
-  note for SongGenerationStrategy "persistence in service, not in strategy"
+  factoryModule ..> MockSongGeneratorStrategy
+  factoryModule ..> SunoSongGeneratorStrategy
+  serviceModule --> factoryModule
+  serviceModule --> SongGenerationStrategy
+  note for MockSongGeneratorStrategy "offline fake task + URL"
+  note for SunoSongGeneratorStrategy "POST generate, GET record-info"
+  note for serviceModule "service.py run_generation refresh_status"
+  note for factoryModule "factory.py get and create strategy"
 ```
 
-**Implementation notes (same as the diagram footnotes):**
+**How this ties to ViewSets:** `AIGenerationRequestViewSet` (actions `run` / `poll`) and `SongViewSet` (e.g. `sync_status`) call into `service.py` — arrows to `service` are not duplicated in the diagrams above to avoid clutter; the **code imports `service` directly**.
 
-* **`auth_config` / `auth_google` / `generation_config`** are **functions** with `@api_view`, not DRF `APIView` subclasses — they are drawn as named callables in Mermaid.
-* **`SunoSongGeneratorStrategy`** calls the provider over **`requests`** in `generate` / `fetch_status`.
-* **Enums (domain text fields):** `Song.generation_status` and `AIGenerationRequest.status` use `GenerationStatus`. `SongPrompt` uses `Occasion`, `MoodTone`, `SingerTone` — see `backend/songs/models/*.py`.
-* **Persistence / ERD** for entities: `backend/songs/models/`.
+---
 
-## Exported image (optional)
+## Notes
 
-For slides or print, the same layout (earlier export) is also available as a bitmap:
-
-![Class diagram (PNG export)](images/class-diagram.png)
+* **Domain entities / ERD:** [`domain-model.md`](domain-model.md)
+* **Domain enum values** (`GenerationStatus`, etc.): `backend/songs/models/`
 
 ← [Back to main README](../README.md#system-documentation)

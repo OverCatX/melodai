@@ -450,6 +450,6 @@ Central place for model and diagram write-ups. Each row links to a page under `d
 | Document | What it contains |
 |----------|------------------|
 | [Domain model](docs/domain-model.md) | Overview image (`docs/images/domain_model.png`), Mermaid `erDiagram` vs `songs/models/` |
-| [Class diagram (UML)](docs/classdiagram.md) | **Mermaid** `classDiagram` in the doc + optional `docs/images/class-diagram.png` |
+| [Class diagram (UML)](docs/classdiagram.md) | **Mermaid** `classDiagram` blocks in the doc (source of truth) |
 | [Sequence — song generation](docs/Sequence-diagram.md) | Generation use case — `docs/images/sequence -diagram.png` |
 | [MVT architecture](docs/mvt-diagram.md) | Model–View–Template for this REST + React app — `docs/images/mvt-diagram.png` |
