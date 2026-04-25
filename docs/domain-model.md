@@ -4,7 +4,7 @@ Overview figure, **Mermaid ERD**, and **enumerations** — aligned 1:1 with `bac
 
 **Conventions (Django):** Every `models.Model` has an autoincrement integer primary key **`id`** in the database (not shown in the diagram below). The UUID fields such as `user_id`, `song_id`, etc. are **additional** business identifiers (`unique=True`, `editable=False`) as in the source files.
 
-![MeloDAI domain model](domain_model.png)
+![MeloDAI domain model](images/domain_model.png)
 
 ## Entity–relationship (Mermaid)
 

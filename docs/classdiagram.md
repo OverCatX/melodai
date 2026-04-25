@@ -81,6 +81,6 @@ classDiagram
 
 For slides or print, the same layout (earlier export) is also available as a bitmap:
 
-![Class diagram (PNG export)](class-diagram.png)
+![Class diagram (PNG export)](images/class-diagram.png)
 
 ← [Back to main README](../README.md#system-documentation)
