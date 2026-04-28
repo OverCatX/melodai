@@ -6,7 +6,7 @@ A Django REST API for AI-powered song generation, implementing the **Strategy Pa
 
 ## Project Structure
 
-After `git clone`, your root folder is usually **`melodai/`** (this README uses that name; a ZIP may use a different folder name as long as it contains the folders below).
+After `git clone`, your root folder is usually `**melodai/`** (this README uses that name; a ZIP may use a different folder name as long as it contains the folders below).
 
 ```
 melodai/
@@ -48,7 +48,7 @@ cd melodai
 
 If you already downloaded the project as a ZIP, unzip it, then `cd` into the root folder that contains `backend/` and `frontend/`.
 
-If your folder is **not** named `melodai` (e.g. a fork or a different clone path), that is fine — use whatever directory contains **`backend/`** and **`frontend/`**.
+If your folder is **not** named `melodai` (e.g. a fork or a different clone path), that is fine — use whatever directory contains `**backend/`** and `**frontend/**`.
 
 All commands below are run from this **project root** (that folder), unless noted.
 
@@ -67,10 +67,12 @@ python3 manage.py runserver
 
 Keep this terminal open. The API will be at:
 
+
 | URL                            | Purpose                                                |
 | ------------------------------ | ------------------------------------------------------ |
 | `http://127.0.0.1:8000/api/`   | JSON REST API                                          |
 | `http://127.0.0.1:8000/admin/` | Django Admin (create a superuser first if you need it) |
+
 
 ### 3. Frontend (Vite + React)
 
@@ -85,7 +87,7 @@ npm run dev
 
 If you are still inside `backend/` from step 2, use `cd ../frontend` instead of `cd frontend`.
 
-Open **`http://localhost:5173`** in your browser. The **Login** page needs **Google OAuth** to be configured — if the Google button is missing or sign-in fails, set `GOOGLE_OAUTH_CLIENT_ID` in `backend/.env` and `VITE_GOOGLE_CLIENT_ID` in `frontend/.env` (see [Environment variables](#environment-variables)), then restart **both** the API and `npm run dev`.
+Open `**http://localhost:5173**` in your browser. The **Login** page needs **Google OAuth** to be configured — if the Google button is missing or sign-in fails, set `GOOGLE_OAUTH_CLIENT_ID` in `backend/.env` and `VITE_GOOGLE_CLIENT_ID` in `frontend/.env` (see [Environment variables](#environment-variables)), then restart **both** the API and `npm run dev`.
 
 The frontend connects to the backend at `http://127.0.0.1:8000`. It has two pages:
 
@@ -114,20 +116,35 @@ SUNO_API_KEY=your_bearer_token_here
 # ALLOW_DISPLAY_NAME_GET_OR_CREATE=true
 ```
 
-**Web app sign-in** is **Google only**. Set `GOOGLE_OAUTH_CLIENT_ID` in `backend/.env` and run the API — the login page uses **`GET /api/auth/config/`** (or `VITE_GOOGLE_CLIENT_ID` at build time if you set `frontend/.env`).
+**Web app sign-in** is **Google only**. Set `GOOGLE_OAUTH_CLIENT_ID` in `backend/.env` and run the API — the login page uses `**GET /api/auth/config/`** (or `VITE_GOOGLE_CLIENT_ID` at build time if you set `frontend/.env`).
 
 ### Google OAuth (required for the web UI)
 
-1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an **OAuth 2.0 Client ID** of type **Web application**.
-2. Add **Authorized JavaScript origins**: `http://localhost:5173` (and your production origin if needed).
-3. Put the **Client ID** in `backend/.env` as `GOOGLE_OAUTH_CLIENT_ID` (used to verify `id_token` and to serve `GET /api/auth/config/`).
-4. `POST /api/auth/google/` with body `{"id_token":"<JWT>"}` returns a `session_token`. The app stores it and sends `Authorization: Bearer <session_token>`. The legacy **`POST /api/users/get-or-create/`** is **disabled** unless you set `ALLOW_DISPLAY_NAME_GET_OR_CREATE=true` (for curl testing only).
+The React app uses **[Sign in with Google](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)** (`@react-oauth/google`): Google returns an **ID token in the browser**, and the frontend sends it to `**POST /api/auth/google/`**. There is **no** Google redirect to a URL on this backend (no `/oauth/callback` path to register). What must match Google Cloud Console is the **origin** of the page where you open the app (scheme + host + port).
+
+#### Google Cloud Console (step by step)
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) → select or create a project.
+2. **OAuth consent screen** ([Branding](https://console.cloud.google.com/auth/branding)): choose **External** (typical for coursework), fill **App name** and **User support email**, save. If the app is in **Testing**, add your Google account under **Test users** so you can sign in.
+3. **Credentials** → **Create credentials** → **OAuth client ID** → Application type **Web application**.
+4. **Authorized JavaScript origins** — add every origin where you run the UI (scheme + host + port, **no path**):
+  - Local dev with the default Vite port: `**http://localhost:5173`** (this repo’s `npm run dev`; use the exact URL you type in the browser). If you open the app as `**http://127.0.0.1:5173**`, add that origin too — `localhost` and `127.0.0.1` are different to Google.
+  - Google’s GIS docs also recommend `**http://localhost**` alongside the port-specific origin for local testing.
+  - Production: e.g. `**https://your-domain.com**`
+5. **Authorized redirect URIs** — for this project’s **button / credential** flow you **do not** use a custom redirect URL. Leave this list **empty** unless Google’s console or a specific error asks for one; if you must add a URI, use the **same origin** as the app (e.g. `**http://localhost:5173`**) — not `http://127.0.0.1:8000` and not an API path. Redirect-based OAuth (e.g. `/auth/google/callback`) is **not** how this codebase signs in.
+6. Copy the **Client ID** (ends with `.apps.googleusercontent.com`) into `backend/.env` as `**GOOGLE_OAUTH_CLIENT_ID`**. Optionally set the same value in `frontend/.env` as `**VITE_GOOGLE_CLIENT_ID**`; if you omit it, the login page loads the ID from `**GET /api/auth/config/**` once the API is running.
+7. Restart `**python manage.py runserver**` and `**npm run dev**` after changing env files.
+
+**Flow recap:** `POST /api/auth/google/` with body `{"id_token":"<JWT>"}` verifies the token and returns a `session_token`. The app stores it and sends `Authorization: Bearer <session_token>`. The legacy `**POST /api/users/get-or-create/`** is **disabled** unless you set `ALLOW_DISPLAY_NAME_GET_OR_CREATE=true` (for curl testing only).
+
+**Common issues:** `origin_mismatch` → fix **Authorized JavaScript origins** to include the exact origin (including port). Wrong client type (e.g. Android/iOS only) → use **Web application**. Consent screen **Testing** without your account as a test user → cannot complete sign-in.
 
 ---
 
 ## Strategy Pattern Overview
 
 The generation layer uses the **Strategy Pattern** so that generation behavior can be swapped without changing any other part of the system.
+
 
 | Component          | File                                  | Role                                                                            |
 | ------------------ | ------------------------------------- | ------------------------------------------------------------------------------- |
@@ -137,6 +154,7 @@ The generation layer uses the **Strategy Pattern** so that generation behavior c
 | Factory            | `songs/generation/factory.py`         | Reads `GENERATOR_STRATEGY` from env/settings, instantiates the correct strategy |
 | Service            | `songs/generation/service.py`         | Orchestrates `run_generation()` and `refresh_generation_status()`               |
 
+
 **Strategy is selected via environment variable — selection is centralized in `factory.py` with no scattered `if/else` across the codebase.**
 
 ---
@@ -145,7 +163,7 @@ The generation layer uses the **Strategy Pattern** so that generation behavior c
 
 ### Automated tests (Django)
 
-Backend tests live in **`backend/songs/tests/`** (e.g. `test_api.py`). They use Django’s test runner, a **temporary SQLite database** (no need for `db.sqlite3` while testing), and **do not** call Google or Suno in production mode — Google `id_token` verification is **mocked**; generation uses the **Mock** strategy.
+Backend tests live in `**backend/songs/tests/`** (e.g. `test_api.py`). They use Django’s test runner, a **temporary SQLite database** (no need for `db.sqlite3` while testing), and **do not** call Google or Suno in production mode — Google `id_token` verification is **mocked**; generation uses the **Mock** strategy.
 
 **Run all tests** from `backend/` with the project venv:
 
@@ -157,20 +175,24 @@ python manage.py test songs
 
 **Useful options:**
 
-| Command | What it does |
-|--------|----------------|
-| `python manage.py test songs -v 2` | Verbose: print each test name |
-| `python manage.py test songs.tests.test_api.MockGenerationRunTests` | Run one test class only |
-| `python manage.py test songs.tests.test_api.AuthGoogleTests.test_valid_id_token_returns_user_and_session` | Run a single test method |
+
+| Command                                                                                                   | What it does                  |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `python manage.py test songs -v 2`                                                                        | Verbose: print each test name |
+| `python manage.py test songs.tests.test_api.MockGenerationRunTests`                                       | Run one test class only       |
+| `python manage.py test songs.tests.test_api.AuthGoogleTests.test_valid_id_token_returns_user_and_session` | Run a single test method      |
+
 
 **What is covered (high level):**
 
-| Area | What the tests check |
-|------|----------------------|
-| **Auth** | `GET /api/auth/config/`, `POST /api/auth/google/` (503 / 400 / 200 with mocked verify) |
-| **Users** | `POST /api/users/get-or-create/` when allowed vs forbidden; `GET /api/users/{id}/songs/` Bearer scoping (403 for another user’s id) |
+
+| Area           | What the tests check                                                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Auth**       | `GET /api/auth/config/`, `POST /api/auth/google/` (503 / 400 / 200 with mocked verify)                                                  |
+| **Users**      | `POST /api/users/get-or-create/` when allowed vs forbidden; `GET /api/users/{id}/songs/` Bearer scoping (403 for another user’s id)     |
 | **Generation** | `GET/POST /api/generation-config/`; full **Mock** path: create user → song → prompt → `generation-request` → `…/run/` until `COMPLETED` |
-| **Models** | Light sanity (e.g. `User` string) |
+| **Models**     | Light sanity (e.g. `User` string)                                                                                                       |
+
 
 **Frontend:** there is no automated UI test in this repo yet; exercise the Vite app manually (see **Option 2** below) or add something like Vitest/Playwright separately if you need it.
 
@@ -192,7 +214,7 @@ export BASE=http://127.0.0.1:8000/api
 
 **Step 1 — Create a user (or obtain a session)**
 
-By default, **`POST /api/users/get-or-create/` is disabled**. For this curl walkthrough, add to `backend/.env`:
+By default, `**POST /api/users/get-or-create/` is disabled**. For this curl walkthrough, add to `backend/.env`:
 
 `ALLOW_DISPLAY_NAME_GET_OR_CREATE=true` — then restart the server.
 
@@ -328,10 +350,12 @@ curl -s -X POST "$BASE/generation-requests/$REQ_ID/poll/" \
 
 Wait until `run` / `stream` finishes with `status: COMPLETED`, then download.
 
-| Value | Where to get it |
-| ----- | --------------- |
+
+| Value       | Where to get it                                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------------------------------- |
 | **SONG_ID** | The `song_id` field in the last JSON line (**not** the generation request’s `"id"`), or the song id from Step 2 |
-| **USER_ID** | Your user’s numeric `id` from Step 1 (same account that owns the song) |
+| **USER_ID** | Your user’s numeric `id` from Step 1 (same account that owns the song)                                          |
+
 
 **Web UI:** use Download — the app adds `?user_id` for you.  
 **curl:** you must add `?user_id=$USER_ID` or the server returns **404**.
@@ -346,12 +370,14 @@ The file is saved in the directory where you run `curl` (often `~`); or use e.g.
 
 **Switch strategy at runtime (no restart):**
 
+
 | Action                 | Request                                                           |
 | ---------------------- | ----------------------------------------------------------------- |
 | Check current strategy | `GET /api/generation-config/`                                     |
 | Switch to Mock         | `POST /api/generation-config/` `{"generator_strategy": "mock"}`   |
 | Switch to Suno         | `POST /api/generation-config/` `{"generator_strategy": "suno"}`   |
 | Revert to `.env`       | `POST /api/generation-config/` `{"clear_runtime_override": true}` |
+
 
 ---
 
@@ -374,6 +400,7 @@ Django REST Framework provides a built-in web interface for every endpoint.
 
 Open any of these in your browser:
 
+
 | URL                                                        | What you can do                                         |
 | ---------------------------------------------------------- | ------------------------------------------------------- |
 | `http://127.0.0.1:8000/api/`                               | Browse all endpoints                                    |
@@ -382,6 +409,7 @@ Open any of these in your browser:
 | `http://127.0.0.1:8000/api/generation-requests/{id}/run/`  | Trigger generation                                      |
 | `http://127.0.0.1:8000/api/generation-requests/{id}/poll/` | Poll status                                             |
 | `http://127.0.0.1:8000/api/songs/{id}/download/?user_id=`  | Download audio (GET; set `user_id` to the song’s owner) |
+
 
 Download is a **GET** that returns a binary file — see **Option 1, Step 6** for a `curl` example. Most other links in the table are POST and show an HTML form in DRF.
 
@@ -413,6 +441,7 @@ song.audio_file_url='https://...'
 
 ### Resources
 
+
 | Endpoint                    | Resource            | Methods                                                                                                                                       |
 | --------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/api/users/`               | User                | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
@@ -424,24 +453,29 @@ song.audio_file_url='https://...'
 | `/api/playback-sessions/`   | PlaybackSession     | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
 | `/api/drafts/`              | Draft               | GET, POST, PUT, PATCH, DELETE                                                                                                                 |
 
+
 ### Generation Actions
 
-| Endpoint                              | Method | Description                                                                                               |
-| ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
-| `/api/users/get-or-create/`           | POST   | Create or retrieve user by `username` — **only if** `ALLOW_DISPLAY_NAME_GET_OR_CREATE=true` (default: off)       |
-| `/api/generation-requests/{id}/run/`  | POST   | Execute generation; optional `?stream=1` streams poll lines (`text/plain`, last line JSON; use `curl -N`) |
-| `/api/generation-requests/{id}/poll/` | POST   | Poll Suno task status (`record-info`)                                                                     |
-| `/api/songs/{id}/sync-status/`        | POST   | Re-sync song status from latest generation request                                                        |
-| `/api/songs/{id}/download/`           | GET    | Stream download; requires `?user_id=` (song owner), same as other song detail routes                      |
-| `/api/generation-config/`             | GET    | View current strategy + source + suno key status                                                          |
-| `/api/generation-config/`             | POST   | Switch strategy or clear runtime override                                                                 |
+
+| Endpoint                              | Method | Description                                                                                                |
+| ------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| `/api/users/get-or-create/`           | POST   | Create or retrieve user by `username` — **only if** `ALLOW_DISPLAY_NAME_GET_OR_CREATE=true` (default: off) |
+| `/api/generation-requests/{id}/run/`  | POST   | Execute generation; optional `?stream=1` streams poll lines (`text/plain`, last line JSON; use `curl -N`)  |
+| `/api/generation-requests/{id}/poll/` | POST   | Poll Suno task status (`record-info`)                                                                      |
+| `/api/songs/{id}/sync-status/`        | POST   | Re-sync song status from latest generation request                                                         |
+| `/api/songs/{id}/download/`           | GET    | Stream download; requires `?user_id=` (song owner), same as other song detail routes                       |
+| `/api/generation-config/`             | GET    | View current strategy + source + suno key status                                                           |
+| `/api/generation-config/`             | POST   | Switch strategy or clear runtime override                                                                  |
+
 
 ### Authentication (Google)
 
-| Endpoint                | Method | Description                                                                                    |
-| ----------------------- | ------ | ---------------------------------------------------------------------------------------------- |
-| `/api/auth/config/`     | GET    | Public: `{"google_client_id":"..."}` for the Login page (empty if OAuth is not configured)  |
-| `/api/auth/google/`     | POST   | Body `{"id_token":"..."}` — verify Google JWT; returns user + `session_token` for `Authorization: Bearer` (requires `GOOGLE_OAUTH_CLIENT_ID`) |
+
+| Endpoint            | Method | Description                                                                                                                                   |
+| ------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/auth/config/` | GET    | Public: `{"google_client_id":"..."}` for the Login page (empty if OAuth is not configured)                                                    |
+| `/api/auth/google/` | POST   | Body `{"id_token":"..."}` — verify Google JWT; returns user + `session_token` for `Authorization: Bearer` (requires `GOOGLE_OAUTH_CLIENT_ID`) |
+
 
 ---
 
@@ -449,9 +483,12 @@ song.audio_file_url='https://...'
 
 Central place for model and diagram write-ups. Each row links to a page under `docs/` (figures are in `docs/images/` where noted). **Testing** (automated + curl) is in this README, **[Testing Guide](#testing-guide)**.
 
-| Document | What it contains |
-|----------|------------------|
-| [Domain model](docs/domain-model.md) | Overview image (`docs/images/domain_model.png`), Mermaid `erDiagram` vs `songs/models/` |
-| [Class diagram (UML)](docs/classdiagram.md) | **Mermaid** `classDiagram` blocks in the doc (source of truth) |
-| [Sequence — song generation](docs/Sequence-diagram.md) | Generation use case — `docs/images/sequence -diagram.png` |
-| [MVT architecture](docs/mvt-diagram.md) | Model–View–Template for this REST + React app — `docs/images/mvt-diagram.png` |
+
+| Document                                               | What it contains                                                                        |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| [Domain model](docs/domain-model.md)                   | Overview image (`docs/images/domain_model.png`), Mermaid `erDiagram` vs `songs/models/` |
+| [Class diagram (UML)](docs/classdiagram.md)            | **Mermaid** `classDiagram` blocks in the doc (source of truth)                          |
+| [Sequence — song generation](docs/Sequence-diagram.md) | Generation use case — `docs/images/sequence -diagram.png`                               |
+| [MVT architecture](docs/mvt-diagram.md)                | Model–View–Template for this REST + React app — `docs/images/mvt-diagram.png`           |
+
+
