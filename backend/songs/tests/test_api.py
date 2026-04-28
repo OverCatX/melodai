@@ -30,18 +30,41 @@ class CleanCacheMixin:
 
 class AuthConfigTests(CleanCacheMixin, APITestCase):
     def test_auth_config_empty_when_not_configured(self) -> None:
-        with override_settings(GOOGLE_OAUTH_CLIENT_ID=""):
+        with override_settings(
+            GOOGLE_OAUTH_CLIENT_ID="",
+            GOOGLE_OAUTH_CLIENT_SECRET="",
+        ):
             r = self.client.get(f"{API}/auth/config/")
         self.assertEqual(r.status_code, status.HTTP_200_OK)
-        self.assertEqual(r.json().get("google_client_id"), "")
+        body = r.json()
+        self.assertEqual(body.get("google_client_id"), "")
+        self.assertEqual(body.get("google_login_url"), "")
+        self.assertIs(body.get("google_oauth_ready"), False)
 
-    @override_settings(GOOGLE_OAUTH_CLIENT_ID="testclient.apps.googleusercontent.com")
-    def test_auth_config_returns_client_id(self) -> None:
+    @override_settings(
+        GOOGLE_OAUTH_CLIENT_ID="testclient.apps.googleusercontent.com",
+        GOOGLE_OAUTH_CLIENT_SECRET="",
+    )
+    def test_auth_config_ready_false_without_secret(self) -> None:
         r = self.client.get(f"{API}/auth/config/")
         self.assertEqual(r.status_code, status.HTTP_200_OK)
+        body = r.json()
         self.assertEqual(
-            r.json().get("google_client_id"), "testclient.apps.googleusercontent.com"
+            body.get("google_client_id"), "testclient.apps.googleusercontent.com"
         )
+        self.assertIs(body.get("google_oauth_ready"), False)
+        self.assertIn("/api/auth/google/login/", body.get("google_login_url", ""))
+
+    @override_settings(
+        GOOGLE_OAUTH_CLIENT_ID="testclient.apps.googleusercontent.com",
+        GOOGLE_OAUTH_CLIENT_SECRET="s3cr3t",
+    )
+    def test_auth_config_ready_with_secret(self) -> None:
+        r = self.client.get(f"{API}/auth/config/")
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        body = r.json()
+        self.assertIs(body.get("google_oauth_ready"), True)
+        self.assertIn("/api/auth/google/login/", body.get("google_login_url", ""))
 
 
 class AuthGoogleTests(CleanCacheMixin, APITestCase):
@@ -76,6 +99,84 @@ class AuthGoogleTests(CleanCacheMixin, APITestCase):
         self.assertEqual(body.get("email"), "a@example.com")
         u = User.objects.get(google_id="google-sub-123")
         self.assertEqual(u.session_token, body["session_token"])
+
+
+class AuthGoogleRedirectTests(CleanCacheMixin, APITestCase):
+    @override_settings(
+        GOOGLE_OAUTH_CLIENT_ID="",
+        GOOGLE_OAUTH_CLIENT_SECRET="",
+        GOOGLE_OAUTH_REDIRECT_URI="http://127.0.0.1:8000/api/auth/google/callback/",
+    )
+    def test_login_redirects_to_frontend_when_misconfigured(self) -> None:
+        r = self.client.get(f"{API}/auth/google/login/")
+        self.assertEqual(r.status_code, 302)
+        loc = r.headers.get("Location", "")
+        self.assertIn("/auth/callback", loc)
+        self.assertIn("error=", loc)
+
+    @override_settings(
+        GOOGLE_OAUTH_CLIENT_ID="cid.apps.googleusercontent.com",
+        GOOGLE_OAUTH_CLIENT_SECRET="secret",
+        GOOGLE_OAUTH_REDIRECT_URI="http://127.0.0.1:8000/api/auth/google/callback/",
+    )
+    def test_login_redirects_to_google(self) -> None:
+        r = self.client.get(f"{API}/auth/google/login/")
+        self.assertEqual(r.status_code, 302)
+        loc = r.headers.get("Location", "")
+        self.assertIn("accounts.google.com", loc)
+        self.assertIn("client_id=", loc)
+
+    @override_settings(
+        GOOGLE_OAUTH_CLIENT_ID="cid.apps.googleusercontent.com",
+        GOOGLE_OAUTH_CLIENT_SECRET="secret",
+        GOOGLE_OAUTH_REDIRECT_URI="http://127.0.0.1:8000/api/auth/google/callback/",
+    )
+    @mock.patch("songs.views.auth_google.requests.post")
+    @mock.patch("songs.views.auth_google.id_token.verify_oauth2_token")
+    def test_callback_exchanges_code_and_redirects_to_spa(
+        self, mock_verify, mock_post
+    ) -> None:
+        s = self.client.session
+        s["google_oauth_state"] = "state-token"
+        s["google_oauth_frontend_base"] = "http://localhost:5173"
+        s.save()
+
+        mock_resp = mock.MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {"id_token": "jwt-from-google"}
+        mock_post.return_value = mock_resp
+        mock_verify.return_value = {
+            "sub": "google-sub-callback",
+            "email": "b@example.com",
+            "name": "Callback User",
+        }
+
+        r = self.client.get(
+            f"{API}/auth/google/callback/?code=authcode&state=state-token"
+        )
+        self.assertEqual(r.status_code, 302)
+        loc = r.headers.get("Location", "")
+        self.assertIn("http://localhost:5173/auth/callback", loc)
+        self.assertIn("session_token=", loc)
+        u = User.objects.get(google_id="google-sub-callback")
+        self.assertTrue(u.session_token)
+
+    @override_settings(
+        GOOGLE_OAUTH_CLIENT_ID="cid.apps.googleusercontent.com",
+        GOOGLE_OAUTH_CLIENT_SECRET="secret",
+        GOOGLE_OAUTH_REDIRECT_URI="http://127.0.0.1:8000/api/auth/google/callback/",
+    )
+    def test_callback_rejects_bad_state(self) -> None:
+        s = self.client.session
+        s["google_oauth_state"] = "expected"
+        s["google_oauth_frontend_base"] = "http://localhost:5173"
+        s.save()
+        r = self.client.get(
+            f"{API}/auth/google/callback/?code=authcode&state=wrong"
+        )
+        self.assertEqual(r.status_code, 302)
+        loc = r.headers.get("Location", "")
+        self.assertIn("invalid_state", loc)
 
 
 class UserGetOrCreateTests(CleanCacheMixin, APITestCase):

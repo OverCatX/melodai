@@ -167,8 +167,20 @@ SUNO_CALLBACK_URL = os.environ.get(
     "SUNO_CALLBACK_URL", "https://example.com/suno-callback-placeholder"
 ).strip()
 
-# Google Sign-In: Web client ID (must match the frontend gapi client; used to verify id_token).
+# Google Sign-In: Web client ID (used to verify id_token and in OAuth authorization URL).
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "").strip()
+# Required for browser OAuth (authorization code) flow: GET /api/auth/google/login/ → callback.
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
+# Must match an "Authorized redirect URI" in Google Cloud (Web client). Default matches runserver.
+GOOGLE_OAUTH_REDIRECT_URI = os.environ.get(
+    "GOOGLE_OAUTH_REDIRECT_URI",
+    "http://127.0.0.1:8000/api/auth/google/callback/",
+).strip()
+# Where the API sends the user after Google login (SPA receives session in query string).
+GOOGLE_OAUTH_FRONTEND_BASE = os.environ.get(
+    "GOOGLE_OAUTH_FRONTEND_BASE",
+    "http://localhost:5173",
+).strip().rstrip("/")
 # When False (default), POST /api/users/get-or-create/ is disabled; sign-in is Google only.
 # Set to true only for local curl/Postman testing without a browser.
 _ALLOW_RAW = os.environ.get("ALLOW_DISPLAY_NAME_GET_OR_CREATE", "").strip().lower()

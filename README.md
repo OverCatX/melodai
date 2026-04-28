@@ -4,199 +4,106 @@ A Django REST API for AI-powered song generation, implementing the **Strategy Pa
 
 ---
 
-## Project Structure
-
-After `git clone`, your root folder is usually `**melodai/`** (this README uses that name; a ZIP may use a different folder name as long as it contains the folders below).
-
-```
-melodai/
-├── backend/                        # Django REST API
-│   ├── config/                     # Project settings & URLs
-│   ├── songs/
-│   │   ├── generation/
-│   │   │   ├── base.py             # Strategy interface (ABC)
-│   │   │   ├── factory.py          # Strategy factory + runtime override
-│   │   │   ├── service.py          # run_generation / refresh_generation_status
-│   │   │   ├── song_generation_request.py  # Request dataclass
-│   │   │   ├── song_generation_result.py   # Result dataclass
-│   │   │   └── strategies/
-│   │   │       ├── mock.py         # MockSongGeneratorStrategy
-│   │   │       └── suno.py         # SunoSongGeneratorStrategy
-│   │   ├── models/                 # Domain models
-│   │   ├── serializers/
-│   │   ├── views/
-│   │   └── management/commands/    # seed, demo_generation
-│   ├── .env.example
-│   └── requirements.txt
-└── frontend/                       # React + Vite (Create Music, My Library)
-```
-
----
-
 ## Setup
 
-**What you need:** [Git](https://git-scm.com/), **Python 3.11+**, **Node.js 18+** (and npm), and two terminal windows (one for the API, one for the web app).
+**Prerequisites:** [Git](https://git-scm.com/), **Python 3.11+**, **Node.js 18+** (npm), and **two terminals** (backend + frontend).
+
+Work from the **repository root**: the folder that contains `**backend/`** and `**frontend/**` (often `melodai` after `git clone`). ZIP downloads: unzip, then `cd` into that same kind of folder.
 
 ### 1. Get the project
-
-Clone the repository and go into the project folder (the folder name is `melodai` with the default clone command):
 
 ```bash
 git clone https://github.com/OverCatX/melodai.git
 cd melodai
 ```
 
-If you already downloaded the project as a ZIP, unzip it, then `cd` into the root folder that contains `backend/` and `frontend/`.
+### 2. Configure Google OAuth
 
-If your folder is **not** named `melodai` (e.g. a fork or a different clone path), that is fine — use whatever directory contains `**backend/`** and `**frontend/**`.
+The web app signs in **only with Google**. Flow in one line: **Login** → Django `**/api/auth/google/login/`** → Google → Django `**/api/auth/google/callback/**` → React `**/auth/callback**` (session stored in the browser).
 
-All commands below are run from this **project root** (that folder), unless noted.
+Do this **before** you expect the Login button to work. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
 
-### 2. Backend (Django API)
+1. Pick or create a project.
+2. **OAuth consent screen** → **Overview** → app name + user support email → **Save**. If the app is in **Testing**, add your Google account under **Test users**.
+3. **Create credentials** → **OAuth client ID** → type **Web application**.
+4. **Authorized JavaScript origins** (scheme + host + port, **no path**): add `http://localhost:5173`, `http://localhost`, and `http://127.0.0.1:5173` if you ever open the UI with that host (`localhost` and `127.0.0.1` are different to Google).
+5. **Authorized redirect URIs**: add **exactly** (trailing slash included unless you change it everywhere):
+  `http://127.0.0.1:8000/api/auth/google/callback/`
+6. **Create** → copy the **Client ID** and **Client secret** into `**backend/.env`** (see [Environment variables](#environment-variables)).
+
+
+| If something fails                   | What to check                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `redirect_uri_mismatch`              | Same callback URL in Google Cloud and in `GOOGLE_OAUTH_REDIRECT_URI`.                    |
+| Login stuck / “not fully configured” | Both `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` set; restart `runserver`. |
+| Access blocked                       | Consent screen **Testing** → your Gmail must be a **Test user**.                         |
+
+
+**Optional:** `POST /api/auth/google/` with `{"id_token":"..."}` for scripts or tests (no client secret).
+
+### 3. Backend (Django)
 
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env              # copy then edit; see [Environment variables](#environment-variables) below
+cp .env.example .env
+# Edit .env: Google keys, optional Suno (see Environment variables)
 python3 manage.py migrate
-python3 manage.py seed            # optional: sample data
+python3 manage.py seed            # optional
 python3 manage.py runserver
 ```
 
-Keep this terminal open. The API will be at:
+
+| URL                            | Purpose      |
+| ------------------------------ | ------------ |
+| `http://127.0.0.1:8000/api/`   | REST API     |
+| `http://127.0.0.1:8000/admin/` | Django admin |
 
 
-| URL                            | Purpose                                                |
-| ------------------------------ | ------------------------------------------------------ |
-| `http://127.0.0.1:8000/api/`   | JSON REST API                                          |
-| `http://127.0.0.1:8000/admin/` | Django Admin (create a superuser first if you need it) |
+### 4. Frontend (React + Vite)
 
-
-### 3. Frontend (Vite + React)
-
-Open a **second** terminal. If you are at the project root (`melodai/`):
+Second terminal, from the **repo root**:
 
 ```bash
-cd frontend
-cp .env.example .env   # Windows: copy .env.example .env — then set VITE_GOOGLE_CLIENT_ID (same as backend GOOGLE_OAUTH_CLIENT_ID) for Google Sign-In
+cd frontend             # from repo root; or cd ../frontend if you are still in backend/
+cp .env.example .env    # optional; frontend needs no Google secrets
 npm install
 npm run dev
 ```
 
-If you are still inside `backend/` from step 2, use `cd ../frontend` instead of `cd frontend`.
+Open `**http://localhost:5173**` and click **Continue with Google**. The hostname must match what you put under **JavaScript origins** in Google.
 
-Open `**http://localhost:5173**` in your browser. The **Login** page needs **Google OAuth** to be configured — if the Google button is missing or sign-in fails, set `GOOGLE_OAUTH_CLIENT_ID` in `backend/.env` and `VITE_GOOGLE_CLIENT_ID` in `frontend/.env` (see [Environment variables](#environment-variables)), then restart **both** the API and `npm run dev`.
-
-The frontend connects to the backend at `http://127.0.0.1:8000`. It has two pages:
-
-- **Create Music** — fill in a prompt, generate a song (Mock or Suno), play it, and download the audio file when ready
-- **My Library** — view all generated songs, play, download, toggle favorites, delete
-
-The active generation strategy is shown in the top-right corner of the nav bar. Click it to toggle between Mock and Suno without restarting the server.
+**In the app:** **Create Music** (generate, play, download) · **My Library**. The **Mock / Suno** badge in the nav switches strategy without restarting servers.
 
 ---
 
-## Environment Variables
+## Environment variables
 
-Copy `.env.example` to `.env` and configure the values. **Never commit `.env`** — it is gitignored.
+Copy `**backend/.env.example`** → `**backend/.env**`. **Never commit `.env`.**
 
 ```env
-# Generation strategy: mock (default) | suno
 GENERATOR_STRATEGY=mock
+SUNO_API_KEY=                      # only if using suno
 
-# Required only when GENERATOR_STRATEGY=suno
-SUNO_API_KEY=your_bearer_token_here
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+GOOGLE_OAUTH_REDIRECT_URI=http://127.0.0.1:8000/api/auth/google/callback/
+GOOGLE_OAUTH_FRONTEND_BASE=http://localhost:5173
 
-# Google Sign-In (required for the web app)
-# GOOGLE_OAUTH_CLIENT_ID=...client-id...apps.googleusercontent.com
-
-# Optional: allow POST /api/users/get-or-create/ for curl/Postman (default: off, Google-only API)
-# ALLOW_DISPLAY_NAME_GET_OR_CREATE=true
+# ALLOW_DISPLAY_NAME_GET_OR_CREATE=true   # curl/Postman only; default off
 ```
 
-**Web app sign-in** is **Google only**. Set `GOOGLE_OAUTH_CLIENT_ID` in `backend/.env` and run the API — the login page uses `**GET /api/auth/config/`** (or `VITE_GOOGLE_CLIENT_ID` at build time if you set `frontend/.env`).
-
-### Google OAuth (required for the web UI)
-
-The React app uses **[Sign in with Google](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)** (`@react-oauth/google`): Google returns an **ID token in the browser**, and the frontend sends it to `**POST /api/auth/google/`**. There is **no** Google redirect to a URL on this backend (no `/oauth/callback` path to register). What must match Google Cloud Console is the **origin** of the page where you open the app (scheme + host + port).
-
-#### Google Cloud Console (step by step)
-
-1. Open [Google Cloud Console](https://console.cloud.google.com/) → select or create a project.
-2. **OAuth consent screen** ([Branding](https://console.cloud.google.com/auth/branding)): choose **External** (typical for coursework), fill **App name** and **User support email**, save. If the app is in **Testing**, add your Google account under **Test users** so you can sign in.
-3. **Credentials** → **Create credentials** → **OAuth client ID** → Application type **Web application**.
-4. **Authorized JavaScript origins** — add every origin where you run the UI (scheme + host + port, **no path**):
-  - Local dev with the default Vite port: `**http://localhost:5173`** (this repo’s `npm run dev`; use the exact URL you type in the browser). If you open the app as `**http://127.0.0.1:5173**`, add that origin too — `localhost` and `127.0.0.1` are different to Google.
-  - Google’s GIS docs also recommend `**http://localhost**` alongside the port-specific origin for local testing.
-  - Production: e.g. `**https://your-domain.com**`
-5. **Authorized redirect URIs** — for this project’s **button / credential** flow you **do not** use a custom redirect URL. Leave this list **empty** unless Google’s console or a specific error asks for one; if you must add a URI, use the **same origin** as the app (e.g. `**http://localhost:5173`**) — not `http://127.0.0.1:8000` and not an API path. Redirect-based OAuth (e.g. `/auth/google/callback`) is **not** how this codebase signs in.
-6. Copy the **Client ID** (ends with `.apps.googleusercontent.com`) into `backend/.env` as `**GOOGLE_OAUTH_CLIENT_ID`**. Optionally set the same value in `frontend/.env` as `**VITE_GOOGLE_CLIENT_ID**`; if you omit it, the login page loads the ID from `**GET /api/auth/config/**` once the API is running.
-7. Restart `**python manage.py runserver**` and `**npm run dev**` after changing env files.
-
-**Flow recap:** `POST /api/auth/google/` with body `{"id_token":"<JWT>"}` verifies the token and returns a `session_token`. The app stores it and sends `Authorization: Bearer <session_token>`. The legacy `**POST /api/users/get-or-create/`** is **disabled** unless you set `ALLOW_DISPLAY_NAME_GET_OR_CREATE=true` (for curl testing only).
-
-**Common issues:** `origin_mismatch` → fix **Authorized JavaScript origins** to include the exact origin (including port). Wrong client type (e.g. Android/iOS only) → use **Web application**. Consent screen **Testing** without your account as a test user → cannot complete sign-in.
-
----
-
-## Strategy Pattern Overview
-
-The generation layer uses the **Strategy Pattern** so that generation behavior can be swapped without changing any other part of the system.
-
-
-| Component          | File                                  | Role                                                                            |
-| ------------------ | ------------------------------------- | ------------------------------------------------------------------------------- |
-| Strategy Interface | `songs/generation/base.py`            | `SongGenerationStrategy` (ABC) with `generate()` + `fetch_status()`             |
-| Mock Strategy      | `songs/generation/strategies/mock.py` | Offline, deterministic, completes instantly                                     |
-| Suno Strategy      | `songs/generation/strategies/suno.py` | Calls Suno API, returns a `taskId` for polling                                  |
-| Factory            | `songs/generation/factory.py`         | Reads `GENERATOR_STRATEGY` from env/settings, instantiates the correct strategy |
-| Service            | `songs/generation/service.py`         | Orchestrates `run_generation()` and `refresh_generation_status()`               |
-
-
-**Strategy is selected via environment variable — selection is centralized in `factory.py` with no scattered `if/else` across the codebase.**
+After login, the UI sends `**Authorization: Bearer <session_token>**`. `**POST /api/users/get-or-create/**` stays disabled unless you set `ALLOW_DISPLAY_NAME_GET_OR_CREATE=true`.
 
 ---
 
 ## Testing Guide
 
-### Automated tests (Django)
+**Further reading:** [Strategy pattern](docs/strategy-pattern.md) · [Automated tests (Django)](docs/automated-tests.md).
 
-Backend tests live in `**backend/songs/tests/`** (e.g. `test_api.py`). They use Django’s test runner, a **temporary SQLite database** (no need for `db.sqlite3` while testing), and **do not** call Google or Suno in production mode — Google `id_token` verification is **mocked**; generation uses the **Mock** strategy.
-
-**Run all tests** from `backend/` with the project venv:
-
-```bash
-cd backend
-source venv/bin/activate    # Windows: venv\Scripts\activate
-python manage.py test songs
-```
-
-**Useful options:**
-
-
-| Command                                                                                                   | What it does                  |
-| --------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `python manage.py test songs -v 2`                                                                        | Verbose: print each test name |
-| `python manage.py test songs.tests.test_api.MockGenerationRunTests`                                       | Run one test class only       |
-| `python manage.py test songs.tests.test_api.AuthGoogleTests.test_valid_id_token_returns_user_and_session` | Run a single test method      |
-
-
-**What is covered (high level):**
-
-
-| Area           | What the tests check                                                                                                                    |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Auth**       | `GET /api/auth/config/`, `POST /api/auth/google/` (503 / 400 / 200 with mocked verify)                                                  |
-| **Users**      | `POST /api/users/get-or-create/` when allowed vs forbidden; `GET /api/users/{id}/songs/` Bearer scoping (403 for another user’s id)     |
-| **Generation** | `GET/POST /api/generation-config/`; full **Mock** path: create user → song → prompt → `generation-request` → `…/run/` until `COMPLETED` |
-| **Models**     | Light sanity (e.g. `User` string)                                                                                                       |
-
-
-**Frontend:** there is no automated UI test in this repo yet; exercise the Vite app manually (see **Option 2** below) or add something like Vitest/Playwright separately if you need it.
-
----
+The sections below are **manual** checks: curl, web UI, browsable API, and management commands.
 
 ### Manual and integration
 
@@ -214,7 +121,7 @@ export BASE=http://127.0.0.1:8000/api
 
 **Step 1 — Create a user (or obtain a session)**
 
-By default, `**POST /api/users/get-or-create/` is disabled**. For this curl walkthrough, add to `backend/.env`:
+By default, `**POST /api/users/get-or-create/`** is disabled. For this curl walkthrough, add to `backend/.env`:
 
 `ALLOW_DISPLAY_NAME_GET_OR_CREATE=true` — then restart the server.
 
@@ -386,7 +293,7 @@ The file is saved in the directory where you run `curl` (often `~`); or use e.g.
 The frontend supports both Mock and Suno with no extra setup.
 
 1. Start both servers (backend + frontend)
-2. Open `http://localhost:5173` and log in (Google — see [Environment variables](#environment-variables) if the Login page is empty)
+2. Open `http://localhost:5173` and log in with Google (if the button is missing, see [Configure Google OAuth](#2-configure-google-oauth))
 3. Click the **Mock / Suno badge** in the top-right to switch strategy
 4. Go to **Create Music**, fill in the form, and click **Generate**
 5. Check **My Library** to see the result — use the 🔄 button to sync status if needed
@@ -471,21 +378,25 @@ song.audio_file_url='https://...'
 ### Authentication (Google)
 
 
-| Endpoint            | Method | Description                                                                                                                                   |
-| ------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/auth/config/` | GET    | Public: `{"google_client_id":"..."}` for the Login page (empty if OAuth is not configured)                                                    |
-| `/api/auth/google/` | POST   | Body `{"id_token":"..."}` — verify Google JWT; returns user + `session_token` for `Authorization: Bearer` (requires `GOOGLE_OAUTH_CLIENT_ID`) |
+| Endpoint                     | Method | Description                                                                                                                            |
+| ---------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/auth/config/`          | GET    | Public: `google_client_id`, `google_login_url`, `google_oauth_ready` (ID + secret set)                                                 |
+| `/api/auth/google/login/`    | GET    | Redirect to Google consent (stores `state` in Django session); requires ID + secret + `GOOGLE_OAUTH_REDIRECT_URI`                      |
+| `/api/auth/google/callback/` | GET    | OAuth redirect: exchange `code`, verify `id_token`, redirect to SPA `/auth/callback?session_token=...`                                 |
+| `/api/auth/google/`          | POST   | Body `{"id_token":"..."}` — verify JWT; returns user + `session_token` (optional; tests / API clients; needs `GOOGLE_OAUTH_CLIENT_ID`) |
 
 
 ---
 
 ## System documentation
 
-Central place for model and diagram write-ups. Each row links to a page under `docs/` (figures are in `docs/images/` where noted). **Testing** (automated + curl) is in this README, **[Testing Guide](#testing-guide)**.
+Central place for design and test notes under `docs/` (figures in `docs/images/` where noted). **Manual** testing (curl, UI, etc.) is in **[Testing Guide](#testing-guide)** above.
 
 
 | Document                                               | What it contains                                                                        |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| [Strategy pattern](docs/strategy-pattern.md)           | Mock/Suno strategy layout, factory, service                                             |
+| [Automated tests (Django)](docs/automated-tests.md)    | `manage.py test`, coverage, no UI tests yet                                             |
 | [Domain model](docs/domain-model.md)                   | Overview image (`docs/images/domain_model.png`), Mermaid `erDiagram` vs `songs/models/` |
 | [Class diagram (UML)](docs/classdiagram.md)            | **Mermaid** `classDiagram` blocks in the doc (source of truth)                          |
 | [Sequence — song generation](docs/Sequence-diagram.md) | Generation use case — `docs/images/sequence -diagram.png`                               |

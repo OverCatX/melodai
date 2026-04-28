@@ -44,8 +44,9 @@ class UserViewSet(viewsets.ModelViewSet):
         ):
             return Response(
                 {
-                    "detail": "Display-name sign-in is disabled. Use POST /api/auth/google/ with an id_token, "
-                    "or set ALLOW_DISPLAY_NAME_GET_OR_CREATE=true in the server environment for API testing only."
+                    "detail": "Display-name sign-in is disabled. Sign in via GET /api/auth/google/login/ in the "
+                    "browser, POST /api/auth/google/ with an id_token for API clients, or set "
+                    "ALLOW_DISPLAY_NAME_GET_OR_CREATE=true for curl/Postman testing only."
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )

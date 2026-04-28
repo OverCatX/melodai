@@ -53,7 +53,7 @@ classDiagram
   class auth_google
   class generation_config
   note for auth_config "auth_google.py GET /api/auth/config/"
-  note for auth_google "auth_google.py POST /api/auth/google/"
+  note for auth_google "auth_google.py GET login+callback, POST /api/auth/google/"
   note for generation_config "generation_config.py GET+POST /api/generation-config/"
 ```
 

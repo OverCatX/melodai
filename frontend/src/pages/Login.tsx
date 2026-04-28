@@ -1,54 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
-import { Music, Loader2 } from 'lucide-react';
-import { authGoogle, getAuthConfig } from '../api';
+import { Music } from 'lucide-react';
+import { getAuthConfig } from '../api';
 
 const Login: React.FC = () => {
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [googleClientId, setGoogleClientId] = useState(
-    (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || ''
-  );
-  const [authConfigLoading, setAuthConfigLoading] = useState(
-    !((import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '')
-  );
-
-  const saveSession = (u: {
-    username: string;
-    id: number;
-    session_token: string;
-    display_name: string;
-    email?: string;
-  }) => {
-    localStorage.setItem(
-      'user',
-      JSON.stringify({
-        username: u.username,
-        id: u.id,
-        session_token: u.session_token,
-        display_name: u.display_name,
-        ...(u.email ? { email: u.email } : {}),
-      })
-    );
-  };
+  const [googleLoginUrl, setGoogleLoginUrl] = useState('');
+  const [oauthReady, setOauthReady] = useState(false);
+  const [authConfigLoading, setAuthConfigLoading] = useState(true);
 
   useEffect(() => {
-    const fromEnv = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '';
-    if (fromEnv) {
-      setAuthConfigLoading(false);
-      return;
-    }
     let cancelled = false;
     (async () => {
       try {
         const cfg = await getAuthConfig();
-        if (!cancelled && cfg.google_client_id) {
-          setGoogleClientId(cfg.google_client_id);
+        if (cancelled) return;
+        setGoogleLoginUrl(cfg.google_login_url || '');
+        setOauthReady(Boolean(cfg.google_oauth_ready));
+        if (!cfg.google_client_id) {
+          setError('');
         }
       } catch {
-        /* backend offline or CORS */
+        if (!cancelled) {
+          setError('Cannot reach the API. Start the Django server at http://127.0.0.1:8000 and refresh.');
+        }
       } finally {
         if (!cancelled) setAuthConfigLoading(false);
       }
@@ -57,6 +31,11 @@ const Login: React.FC = () => {
       cancelled = true;
     };
   }, []);
+
+  const startGoogleLogin = () => {
+    if (!googleLoginUrl) return;
+    window.location.href = googleLoginUrl;
+  };
 
   return (
     <div
@@ -156,7 +135,7 @@ const Login: React.FC = () => {
           </p>
         )}
 
-        {!authConfigLoading && !googleClientId && (
+        {!authConfigLoading && !oauthReady && (
           <p
             style={{
               width: '100%',
@@ -166,57 +145,53 @@ const Login: React.FC = () => {
               lineHeight: 1.5,
             }}
           >
-            Google Sign-In is not configured. Set <code>GOOGLE_OAUTH_CLIENT_ID</code> in{' '}
-            <code>backend/.env</code>, run the API, then refresh this page.
+            Google OAuth is not fully configured. Set <code>GOOGLE_OAUTH_CLIENT_ID</code> and{' '}
+            <code>GOOGLE_OAUTH_CLIENT_SECRET</code> in <code>backend/.env</code>, add the backend
+            callback URL in Google Cloud (see README), restart the API, then refresh.
           </p>
         )}
 
-        {googleClientId && (
-          <div
+        {!authConfigLoading && oauthReady && googleLoginUrl && (
+          <button
+            type="button"
+            onClick={startGoogleLogin}
             style={{
               width: '100%',
-              display: 'flex',
-              justifyContent: 'center',
-            }}
-          >
-            <GoogleOAuthProvider clientId={googleClientId}>
-              <GoogleLogin
-                onSuccess={async (cred) => {
-                  if (!cred.credential) return;
-                  setIsLoading(true);
-                  setError('');
-                  try {
-                    const user = await authGoogle(cred.credential);
-                    saveSession(user);
-                    navigate('/generate');
-                  } catch (err: any) {
-                    setError(
-                      err.message ||
-                        'Google sign-in failed. Check GOOGLE_OAUTH_CLIENT_ID in backend .env.'
-                    );
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                onError={() => setError('Google sign-in was cancelled or failed.')}
-              />
-            </GoogleOAuthProvider>
-          </div>
-        )}
-
-        {isLoading && (
-          <p
-            style={{
+              maxWidth: '280px',
+              padding: '0.75rem 1.25rem',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.06)',
+              color: 'var(--text-primary)',
+              fontSize: '0.9375rem',
+              fontWeight: 500,
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              marginTop: '1rem',
-              color: 'var(--text-secondary)',
+              justifyContent: 'center',
+              gap: '0.75rem',
             }}
           >
-            <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-            Signing in…
-          </p>
+            <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden>
+              <path
+                fill="#FFC107"
+                d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+              />
+              <path
+                fill="#FF3D00"
+                d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+              />
+              <path
+                fill="#4CAF50"
+                d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+              />
+              <path
+                fill="#1976D2"
+                d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+              />
+            </svg>
+            Continue with Google
+          </button>
         )}
 
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

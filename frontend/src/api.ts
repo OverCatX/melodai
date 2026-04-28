@@ -36,12 +36,16 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 // --- Auth ---
-/** Public: Google OAuth Web client id from backend (so VITE_GOOGLE_CLIENT_ID is optional). */
+/** Public: OAuth config — browser login uses google_login_url (GET, full page redirect). */
 export function getAuthConfig() {
-  return apiFetch<{ google_client_id: string }>('/auth/config/');
+  return apiFetch<{
+    google_client_id: string;
+    google_login_url: string;
+    google_oauth_ready: boolean;
+  }>('/auth/config/');
 }
 
-/** Google Sign-In: exchange ID token for app user + session token (set same client ID as backend). */
+/** Optional: exchange a Google ID token for app session (API clients / tests). The web UI uses /auth/google/login/ instead. */
 export function authGoogle(idToken: string) {
   return apiFetch<{
     id: number;
