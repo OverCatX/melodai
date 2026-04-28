@@ -8,8 +8,6 @@ A Django REST API for AI-powered song generation, implementing the **Strategy Pa
 
 **Prerequisites:** [Git](https://git-scm.com/), **Python 3.11+**, **Node.js 18+** (npm), and **two terminals** (backend + frontend).
 
-Work from the **repository root**: the folder that contains `**backend/`** and `**frontend/**` (often `melodai` after `git clone`). ZIP downloads: unzip, then `cd` into that same kind of folder.
-
 ### 1. Get the project
 
 ```bash
